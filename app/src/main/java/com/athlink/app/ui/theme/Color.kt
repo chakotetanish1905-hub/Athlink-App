@@ -1,0 +1,35 @@
+package com.athlink.app.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+val AthlinkOrange = Color(0xFFFF6B35)
+val AthlinkOrangeLight = Color(0xFFFF8C5A)
+val AthlinkOrangeDark = Color(0xFFE84F1A)
+val AthlinkDeepBlue = Color(0xFF1A1F4E)
+val AthlinkBlue = Color(0xFF2D3561)
+val AthlinkBlueLight = Color(0xFF4A5490)
+val AthlinkGold = Color(0xFFFFB800)
+val AthlinkGreen = Color(0xFF00C853)
+val AthlinkRed = Color(0xFFFF3B30)
+val AthlinkWhite = Color(0xFFFFFFFF)
+val AthlinkOffWhite = Color(0xFFF8F9FF)
+val AthlinkLightGray = Color(0xFFEEF0F8)
+val AthlinkMedGray = Color(0xFFB0B7D3)
+val AthlinkDarkGray = Color(0xFF6B7394)
+val AthlinkBlack = Color(0xFF0D0F1E)
+val SurfaceLight = Color(0xFFFFFFFF)
+val SurfaceDark = Color(0xFF141728)
+val BackgroundLight = Color(0xFFF5F6FF)
+val BackgroundDark = Color(0xFF0D0F1E)
+val CardLight = Color(0xFFFFFFFF)
+val CardDark = Color(0xFF1C2040)
+val GradientStart = Color(0xFFFF6B35)
+val GradientEnd = Color(0xFFFF3B86)
+
+// Missing Colors used in SearchCoachScreen
+val CardDark2 = Color(0xFF252A4F)
+val TextPrimary = Color(0xFFFFFFFF)
+val TextSecondary = Color(0xFFB0B7D3)
+val TextMuted = Color(0xFF6B7394)
+val AthBlue = Color(0xFF4A5490)
+val DividerDark = Color(0xFF2D3561)

@@ -1,0 +1,27 @@
+# Gradle / build output
+.gradle/
+.kotlin/
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# Local machine config (SDK path etc.)
+local.properties
+
+# Firebase config - kept out of the public repo. Add your own app/google-services.json locally.
+app/google-services.json
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+.navigation/
+
+# Misc
+*.log
+.DS_Store
+Thumbs.db
+_claude/

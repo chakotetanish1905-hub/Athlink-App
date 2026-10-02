@@ -1,5 +1,6 @@
 package com.athlink.app.data.repository
 
+import com.athlink.app.data.model.CoachRegistration
 import com.athlink.app.data.model.User
 import com.athlink.app.data.model.UserRole
 import com.athlink.app.data.remote.FirebaseAuthSource
@@ -17,6 +18,9 @@ class AuthRepository @Inject constructor(
 
     suspend fun register(name: String, email: String, password: String, role: UserRole): Result<User> =
         authSource.signUp(name, email, password, role)
+
+    suspend fun registerCoach(registration: CoachRegistration): Result<User> =
+        authSource.signUpCoach(registration)
 
     fun logout() = authSource.signOut()
 

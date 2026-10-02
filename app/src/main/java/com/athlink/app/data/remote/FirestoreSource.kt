@@ -19,13 +19,13 @@ class FirestoreSource @Inject constructor(
 
     // ─── Coaches ───────────────────────────────────────────────
     suspend fun getCoaches(): Result<List<Coach>> = try {
-        val snapshot = firestore.collection("coaches").get().await()
+        val snapshot = firestore.collection(FirestorePaths.COACHES).get().await()
         val coaches = snapshot.documents.mapNotNull { it.toObject(Coach::class.java) }
         Result.success(coaches)
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun getCoachById(coachId: String): Result<Coach> = try {
-        val doc = firestore.collection("coaches").document(coachId).get().await()
+        val doc = firestore.collection(FirestorePaths.COACHES).document(coachId).get().await()
         val coach = doc.toObject(Coach::class.java) ?: throw Exception("Coach not found")
         Result.success(coach)
     } catch (e: Exception) { Result.failure(e) }

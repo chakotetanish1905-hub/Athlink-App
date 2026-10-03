@@ -7,8 +7,12 @@ package com.athlink.app.data.model
  * show exactly what the user typed). [validate] checks every field, and [toUser] / [toCoach]
  * map a valid form into the two Firestore documents that make up a coach account:
  *
- *  - `users/{uid}`   -> [User]  (shared account record, role = COACH)
- *  - `coaches/{uid}` -> [Coach] (public coaching profile shown to players)
+ *  - `users/{uid}`        -> [User]  (shared account record, role = COACH)
+ *  - `coaches/{uid}`      -> [Coach] (public coaching profile; DRAFT / NOT_SUBMITTED)
+ *  - `coachPrivate/{uid}` -> [CoachPrivateProfile] (email + phone; never public)
+ *
+ * Signup is "Step 1 — Account" of coach onboarding. The rest of the professional profile is
+ * completed in the onboarding flow, which pre-fills from what was entered here.
  */
 data class CoachRegistration(
     // Account
@@ -84,23 +88,35 @@ data class CoachRegistration(
     fun toCoach(uid: String, now: Long = System.currentTimeMillis()): Coach = Coach(
         uid = uid,
         name = name.trim(),
-        email = email.trim().lowercase(),
-        phone = normalizedPhone(),
         sport = sport.trim(),
         bio = bio.trim(),
         experience = experienceYears.trim().toInt(),
         hourlyRate = hourlyRate.trim().toDouble(),
         city = city.trim(),
         state = state.trim(),
+        country = DEFAULT_COUNTRY,
         location = "${city.trim()}, ${state.trim()}",
         specializations = specializations.splitToList(),
         certifications = certifications.splitToList(),
         coachingLevels = CoachingLevel.entries.filter { it in coachingLevels }.map { it.name },
-        verificationStatus = VerificationStatus.PENDING.name,
+        profileStatus = ProfileStatus.DRAFT.name,
+        verificationStatus = VerificationStatus.NOT_SUBMITTED.name,
+        verificationLevel = VerificationLevel.LEVEL_0_REGISTERED.name,
         isAvailable = true,
         createdAt = now,
         updatedAt = now
     )
+
+    /** Private contact details. Kept out of the public `coaches/{uid}` document. */
+    fun toPrivateProfile(uid: String, now: Long = System.currentTimeMillis()): CoachPrivateProfile =
+        CoachPrivateProfile(
+            uid = uid,
+            fullLegalName = name.trim(),
+            email = email.trim().lowercase(),
+            phone = normalizedPhone(),
+            createdAt = now,
+            updatedAt = now
+        )
 
     /** Keeps a leading '+' and digits only, e.g. "+91 98765-43210" -> "+919876543210". */
     private fun normalizedPhone(): String {
@@ -118,6 +134,7 @@ data class CoachRegistration(
         const val MAX_HOURLY_RATE = 100_000.0
         const val MIN_BIO_LENGTH = 30
         const val MAX_BIO_LENGTH = 500
+        const val DEFAULT_COUNTRY = "India"
         private val EMAIL_REGEX = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
     }
 }
@@ -135,9 +152,6 @@ enum class CoachingLevel(val label: String) {
     ADVANCED("Advanced"),
     PROFESSIONAL("Professional")
 }
-
-/** New coaches start as PENDING until their profile/certifications are reviewed. */
-enum class VerificationStatus { PENDING, VERIFIED, REJECTED }
 
 /** Sports a coach can register for. */
 object Sports {

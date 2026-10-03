@@ -55,8 +55,8 @@ class FirebaseAuthSource @Inject constructor(
      * Coach registration ("POST" for the coach signup form).
      *
      * 1. Creates the Firebase Auth account (email + password).
-     * 2. Writes `users/{uid}` and `coaches/{uid}` in ONE batch, so either both documents
-     *    exist or neither does.
+     * 2. Writes `users/{uid}`, `coaches/{uid}` (public, DRAFT / NOT_SUBMITTED) and
+     *    `coachPrivate/{uid}` (email + phone) in ONE batch, so all exist or none do.
      * 3. If the Firestore write fails, the just-created Auth account is deleted again, so the
      *    user is never left with a login that has no profile and can simply retry.
      *
@@ -71,11 +71,13 @@ class FirebaseAuthSource @Inject constructor(
             val now = System.currentTimeMillis()
             val user = registration.toUser(uid, now)
             val coach = registration.toCoach(uid, now)
+            val privateProfile = registration.toPrivateProfile(uid, now)
 
             try {
                 firestore.batch()
                     .set(firestore.collection(FirestorePaths.USERS).document(uid), user)
                     .set(firestore.collection(FirestorePaths.COACHES).document(uid), coach)
+                    .set(firestore.collection(FirestorePaths.COACH_PRIVATE).document(uid), privateProfile)
                     .commit()
                     .await()
             } catch (e: Exception) {

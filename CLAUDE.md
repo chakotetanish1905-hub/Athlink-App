@@ -22,7 +22,11 @@ Build and run from Android Studio (Hedgehog+), or via Gradle wrapper from the pr
 ./gradlew lint
 ```
 
-There are no test sources in the project yet (no `app/src/test` or `app/src/androidTest` directories), so there is no test command to run.
+```bash
+./gradlew test
+```
+
+JVM unit tests live in `app/src/test` (JUnit 4) and cover the pure-Kotlin coach model, validation, verification policy and profile-completion logic. There are no instrumented (`androidTest`) tests yet.
 
 ## Architecture
 

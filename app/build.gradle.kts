@@ -79,4 +79,7 @@ dependencies {
     implementation(libs.accompanist.systemuicontroller)
 
     debugImplementation(libs.androidx.ui.tooling)
+
+    // Unit tests (pure Kotlin model / validation / policy logic)
+    testImplementation(libs.junit)
 }

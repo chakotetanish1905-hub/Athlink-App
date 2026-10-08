@@ -1,0 +1,13 @@
+{
+  "name": "athlink-admin",
+  "private": true,
+  "description": "Trusted (server-side) admin tool for Athlink organisation verification. Uses the Firebase Admin SDK.",
+  "type": "module",
+  "bin": { "athlink-admin": "admin.js" },
+  "scripts": {
+    "test": "node --test policy.test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "13.4.0"
+  }
+}

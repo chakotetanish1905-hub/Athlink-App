@@ -20,6 +20,21 @@ class EventRepository @Inject constructor(
 
     suspend fun createEvent(event: Event): Result<Unit> =
         firestoreSource.createEvent(event)
+
+    // ── Organisation's own events: real data only, never the dummy fallback ──
+
+    suspend fun getOrganisationEvents(organisationId: String): Result<List<Event>> =
+        firestoreSource.getOrganisationEvents(organisationId)
+
+    suspend fun getEventDrafts(organisationId: String): Result<List<Event>> =
+        firestoreSource.getEventDrafts(organisationId)
+
+    suspend fun saveEventDraft(event: Event): Result<String> = firestoreSource.saveEventDraft(event)
+
+    suspend fun deleteEventDraft(draftId: String): Result<Unit> = firestoreSource.deleteEventDraft(draftId)
+
+    suspend fun publishEvent(event: Event, fromDraftId: String?): Result<String> =
+        firestoreSource.publishEvent(event, fromDraftId)
 }
 
 @Singleton

@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.athlink.app.data.model.OrganisationLanding
 import com.athlink.app.data.model.UserRole
 import com.athlink.app.ui.screens.auth.LoginScreen
 import com.athlink.app.ui.screens.auth.SignupScreen
@@ -16,6 +17,11 @@ import com.athlink.app.ui.screens.coach.CoachProfileScreen
 import com.athlink.app.ui.screens.coach.ManageSessionsScreen
 import com.athlink.app.ui.screens.organisation.CreateEventScreen
 import com.athlink.app.ui.screens.organisation.OrgDashboardScreen
+import com.athlink.app.ui.screens.organisation.OrgEventsScreen
+import com.athlink.app.ui.screens.organisation.OrgGateScreen
+import com.athlink.app.ui.screens.organisation.OrgProfileScreen
+import com.athlink.app.ui.screens.organisation.OrganisationOnboardingScreen
+import com.athlink.app.ui.screens.organisation.OrganisationVerificationStatusScreen
 import com.athlink.app.ui.screens.player.*
 import com.athlink.app.viewmodel.AuthViewModel
 
@@ -198,21 +204,75 @@ fun AthlinkNavHost() {
         }
 
         // ── Organisation Nav Graph ────────────────────────────────────────────
+        // ROLE ≠ VERIFICATION: every organisation enters through ORG_GATE, which routes by the
+        // verification status stored on organisations/{uid} (never by the role alone).
         composable(NavRoutes.ORG_NAV) {
             val orgNavController = rememberNavController()
             val user = authState.user ?: return@composable
+            val logout: () -> Unit = {
+                authViewModel.logout()
+                rootNavController.navigate(NavRoutes.LOGIN) { popUpTo(0) { inclusive = true } }
+            }
+            fun goHome() = orgNavController.navigate(NavRoutes.ORG_HOME) {
+                popUpTo(orgNavController.graph.id) { inclusive = true }
+                launchSingleTop = true
+            }
+            val openVerification: (Boolean) -> Unit = { editable ->
+                orgNavController.navigate(if (editable) NavRoutes.ORG_ONBOARDING else NavRoutes.ORG_VERIFICATION_STATUS) { launchSingleTop = true }
+            }
 
-            NavHost(navController = orgNavController, startDestination = NavRoutes.ORG_HOME) {
+            NavHost(navController = orgNavController, startDestination = NavRoutes.ORG_GATE) {
+
+                composable(NavRoutes.ORG_GATE) {
+                    OrgGateScreen(user = user, onRoute = { landing ->
+                        val dest = when (landing) {
+                            OrganisationLanding.ONBOARDING -> NavRoutes.ORG_ONBOARDING
+                            OrganisationLanding.STATUS -> NavRoutes.ORG_VERIFICATION_STATUS
+                            OrganisationLanding.DASHBOARD -> NavRoutes.ORG_HOME
+                        }
+                        // The dashboard is always underneath, so Back from onboarding/status goes home.
+                        orgNavController.navigate(NavRoutes.ORG_HOME) { popUpTo(NavRoutes.ORG_GATE) { inclusive = true } }
+                        if (dest != NavRoutes.ORG_HOME) orgNavController.navigate(dest)
+                    })
+                }
+
+                composable(NavRoutes.ORG_ONBOARDING) {
+                    OrganisationOnboardingScreen(
+                        user = user,
+                        onExit = { goHome() },
+                        onSubmitted = {
+                            orgNavController.navigate(NavRoutes.ORG_VERIFICATION_STATUS) {
+                                popUpTo(NavRoutes.ORG_HOME) { inclusive = false }
+                            }
+                        }
+                    )
+                }
+
+                composable(NavRoutes.ORG_VERIFICATION_STATUS) {
+                    OrganisationVerificationStatusScreen(
+                        user = user,
+                        onEditVerification = { orgNavController.navigate(NavRoutes.ORG_ONBOARDING) { launchSingleTop = true } },
+                        onOpenDashboard = { goHome() },
+                        onLogout = logout
+                    )
+                }
 
                 composable(NavRoutes.ORG_HOME) {
                     OrgDashboardScreen(
                         user = user,
                         navController = orgNavController,
-                        onLogout = {
-                            authViewModel.logout()
-                            rootNavController.navigate(NavRoutes.LOGIN) { popUpTo(0) { inclusive = true } }
-                        },
-                        onCreateEvent = { orgNavController.navigate(NavRoutes.ORG_CREATE_EVENT) }
+                        onLogout = logout,
+                        onCreateEvent = { orgNavController.navigate(NavRoutes.ORG_CREATE_EVENT) },
+                        onOpenVerification = openVerification
+                    )
+                }
+
+                composable(NavRoutes.ORG_EVENTS) {
+                    OrgEventsScreen(
+                        user = user,
+                        navController = orgNavController,
+                        onCreateEvent = { orgNavController.navigate(NavRoutes.ORG_CREATE_EVENT) },
+                        onEditDraft = { id -> orgNavController.navigate(NavRoutes.orgEditDraft(id)) }
                     )
                 }
 
@@ -220,23 +280,30 @@ fun AthlinkNavHost() {
                     CreateEventScreen(
                         user = user,
                         onBack = { orgNavController.popBackStack() },
-                        onEventCreated = {
-                            orgNavController.navigate(NavRoutes.ORG_HOME) {
-                                popUpTo(NavRoutes.ORG_HOME) { inclusive = false }
-                            }
-                        }
+                        onEventCreated = { orgNavController.popBackStack() },
+                        onOpenVerification = { openVerification(true) }
+                    )
+                }
+
+                composable(
+                    route = NavRoutes.ORG_EDIT_DRAFT,
+                    arguments = listOf(navArgument("draftId") { type = NavType.StringType })
+                ) { backStack ->
+                    CreateEventScreen(
+                        user = user,
+                        draftId = backStack.arguments?.getString("draftId"),
+                        onBack = { orgNavController.popBackStack() },
+                        onEventCreated = { orgNavController.popBackStack() },
+                        onOpenVerification = { openVerification(true) }
                     )
                 }
 
                 composable(NavRoutes.ORG_PROFILE) {
-                    // Re-use PlayerProfileScreen styled for org
-                    PlayerProfileScreen(
+                    OrgProfileScreen(
                         user = user,
-                        onLogout = {
-                            authViewModel.logout()
-                            rootNavController.navigate(NavRoutes.LOGIN) { popUpTo(0) { inclusive = true } }
-                        },
-                        onBack = { orgNavController.navigate(NavRoutes.ORG_HOME) { launchSingleTop = true } }
+                        onBack = { orgNavController.navigate(NavRoutes.ORG_HOME) { launchSingleTop = true } },
+                        onLogout = logout,
+                        onOpenVerification = openVerification
                     )
                 }
             }

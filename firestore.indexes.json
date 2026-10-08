@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "verificationAuditLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organisationId", "order": "ASCENDING" },
+        { "fieldPath": "performedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

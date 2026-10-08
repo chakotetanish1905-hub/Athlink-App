@@ -96,6 +96,47 @@ class FirestoreSource @Inject constructor(
         Result.success(Unit)
     } catch (e: Exception) { Result.failure(e) }
 
+    /** Published events of one organisation (single-field query, no composite index needed). */
+    suspend fun getOrganisationEvents(organisationId: String): Result<List<Event>> = try {
+        val snapshot = firestore.collection(FirestorePaths.EVENTS)
+            .whereEqualTo("organisationId", organisationId).get().await()
+        Result.success(snapshot.documents.mapNotNull { it.toObject(Event::class.java) }.sortedByDescending { it.createdAt })
+    } catch (e: Exception) { Result.failure(e) }
+
+    /** The organisation's private drafts (`eventDrafts`, owner-only in rules). */
+    suspend fun getEventDrafts(organisationId: String): Result<List<Event>> = try {
+        val snapshot = firestore.collection(FirestorePaths.EVENT_DRAFTS)
+            .whereEqualTo("organisationId", organisationId).get().await()
+        Result.success(snapshot.documents.mapNotNull { it.toObject(Event::class.java) }.sortedByDescending { it.createdAt })
+    } catch (e: Exception) { Result.failure(e) }
+
+    /** Creates or overwrites a draft. Returns the draft id. */
+    suspend fun saveEventDraft(event: Event): Result<String> = try {
+        val col = firestore.collection(FirestorePaths.EVENT_DRAFTS)
+        val ref = if (event.id.isBlank()) col.document() else col.document(event.id)
+        ref.set(event.copy(id = ref.id)).await()
+        Result.success(ref.id)
+    } catch (e: Exception) { Result.failure(e) }
+
+    suspend fun deleteEventDraft(draftId: String): Result<Unit> = try {
+        firestore.collection(FirestorePaths.EVENT_DRAFTS).document(draftId).delete().await()
+        Result.success(Unit)
+    } catch (e: Exception) { Result.failure(e) }
+
+    /**
+     * Publishes [event] to `events` (and deletes the draft it came from, in the same batch).
+     * firestore.rules reject this unless the organisation is VERIFIED / OFFICIAL_GOVERNMENT,
+     * unexpired, and the event's organisationName / organisationVerificationLevel match its
+     * organisation document.
+     */
+    suspend fun publishEvent(event: Event, fromDraftId: String?): Result<String> = try {
+        val ref = firestore.collection(FirestorePaths.EVENTS).document()
+        val batch = firestore.batch().set(ref, event.copy(id = ref.id))
+        if (!fromDraftId.isNullOrBlank()) batch.delete(firestore.collection(FirestorePaths.EVENT_DRAFTS).document(fromDraftId))
+        batch.commit().await()
+        Result.success(ref.id)
+    } catch (e: Exception) { Result.failure(e) }
+
     // ─── Messages ────────────────────────────────────────────────
     fun getMessages(threadId: String): Flow<List<Message>> = callbackFlow {
         val listener = firestore.collection("chats")

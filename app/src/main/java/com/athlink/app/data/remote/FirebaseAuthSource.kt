@@ -90,6 +90,48 @@ class FirebaseAuthSource @Inject constructor(
         }
     }
 
+    /**
+     * Organisation registration.
+     *
+     * Writes `users/{uid}` (role ORGANISATION, organisationId = uid) and a minimal
+     * `organisations/{uid}` (UNVERIFIED, level 0) in ONE batch, deleting the Auth account again if
+     * the batch fails. Choosing the Organisation role grants NO trust: the organisation must then
+     * complete onboarding and be approved by an admin before it can publish events.
+     * A verification email is sent (best effort) so the contact step can be completed.
+     */
+    suspend fun signUpOrganisation(name: String, email: String, password: String): Result<User> {
+        return try {
+            val normalisedEmail = email.trim().lowercase()
+            val result = auth.createUserWithEmailAndPassword(normalisedEmail, password).await()
+            val firebaseUser = result.user ?: throw Exception("UID null")
+            val uid = firebaseUser.uid
+            val user = User(
+                uid = uid,
+                name = name.trim(),
+                email = normalisedEmail,
+                role = UserRole.ORGANISATION,
+                organisationId = uid
+            )
+            try {
+                firestore.batch()
+                    .set(firestore.collection(FirestorePaths.USERS).document(uid), user)
+                    .set(
+                        firestore.collection(FirestorePaths.ORGANISATIONS).document(uid),
+                        OrganisationDocs.initialOrganisation(uid, name)
+                    )
+                    .commit()
+                    .await()
+            } catch (e: Exception) {
+                runCatching { firebaseUser.delete().await() }
+                throw e
+            }
+            runCatching { firebaseUser.sendEmailVerification().await() }
+            Result.success(user)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     fun signOut() = auth.signOut()
 
     suspend fun getCurrentUserData(): Result<User> {

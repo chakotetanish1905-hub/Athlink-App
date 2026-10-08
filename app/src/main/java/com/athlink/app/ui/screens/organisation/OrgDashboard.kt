@@ -15,36 +15,57 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import coil.compose.AsyncImage
 import com.athlink.app.data.model.Event
+import com.athlink.app.data.model.OrganisationBadge
 import com.athlink.app.data.model.User
 import com.athlink.app.ui.components.AthlinkBottomBar
+import com.athlink.app.ui.components.OrganisationBadgeChip
+import com.athlink.app.ui.components.accentColor
+import com.athlink.app.ui.components.icon
 import com.athlink.app.ui.components.orgNavItems
 import com.athlink.app.ui.theme.*
-import com.athlink.app.viewmodel.EventViewModel
+import com.athlink.app.viewmodel.OrganisationEventsViewModel
+import com.athlink.app.viewmodel.OrganisationViewModel
 
+/**
+ * Organisation home. Everything comes from Firestore: the organisation's own profile/status and
+ * ONLY its own events (no other organisations' events, no dummy data).
+ */
 @Composable
 fun OrgDashboardScreen(
     user: User,
     navController: NavHostController,
     onLogout: () -> Unit,
     onCreateEvent: () -> Unit,
-    eventViewModel: EventViewModel = hiltViewModel()
+    onOpenVerification: (editable: Boolean) -> Unit,
+    orgViewModel: OrganisationViewModel = hiltViewModel(),
+    eventsViewModel: OrganisationEventsViewModel = hiltViewModel()
 ) {
-    val eventState by eventViewModel.state.collectAsState()
+    val orgState by orgViewModel.state.collectAsState()
+    val eventState by eventsViewModel.state.collectAsState()
     val navBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStack?.destination?.route
+    LaunchedEffect(user.uid) { orgViewModel.load(user); eventsViewModel.load(user) }
+
+    val org = orgState.organisation
+    val name = org?.displayName?.ifBlank { null } ?: user.name.ifEmpty { "Organisation" }
 
     Scaffold(
         bottomBar = { AthlinkBottomBar(orgNavItems, currentRoute) { route -> navController.navigate(route) { launchSingleTop = true } } },
         floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = onCreateEvent, containerColor = AthlinkOrange, contentColor = Color.White, shape = RoundedCornerShape(16.dp)) {
-                Icon(Icons.Default.Add, null); Spacer(Modifier.width(6.dp)); Text("Post Event", fontWeight = FontWeight.Bold)
+            if (eventState.canDraft) {
+                ExtendedFloatingActionButton(onClick = onCreateEvent, containerColor = AthlinkOrange, contentColor = Color.White, shape = RoundedCornerShape(16.dp)) {
+                    Icon(Icons.Default.Add, null); Spacer(Modifier.width(6.dp))
+                    Text(if (eventState.canPublish) "Post Event" else "New Draft", fontWeight = FontWeight.Bold)
+                }
             }
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -53,44 +74,110 @@ fun OrgDashboardScreen(
             item {
                 Box(modifier = Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(AthlinkDeepBlue, AthlinkDeepBlue.copy(0f)))).padding(horizontal = 20.dp, vertical = 24.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Column {
+                        Column(Modifier.weight(1f)) {
                             Text("Organisation", color = AthlinkMedGray, fontSize = 13.sp)
-                            Text(user.name.ifEmpty { "Organisation" }, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Text(name, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(6.dp))
+                            if (orgState.loaded) OrganisationBadgeChip(orgState.badge, onDark = true)
+                        }
+                        IconButton(onClick = { orgViewModel.refresh(user); eventsViewModel.refresh() }) {
+                            Icon(Icons.Default.Refresh, "Refresh", tint = Color.White)
                         }
                         Box(modifier = Modifier.size(42.dp).clip(CircleShape).background(Brush.linearGradient(listOf(GradientStart, GradientEnd))), contentAlignment = Alignment.Center) {
-                            Text(user.name.take(2).uppercase().ifEmpty { "OR" }, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            if (!org?.logoUrl.isNullOrBlank()) {
+                                AsyncImage(model = org?.logoUrl, contentDescription = "Logo", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                            } else {
+                                Text(name.take(2).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
                         }
                     }
                 }
             }
+
+            orgState.error?.let { err ->
+                item { Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) { ErrorCard(err) } }
+            }
+
+            if (orgState.loaded && !orgState.canPublish) {
+                item {
+                    VerificationCtaCard(
+                        badge = orgState.badge,
+                        message = eventState.publishBlockedReason ?: "Complete verification to publish events.",
+                        actionLabel = when {
+                            orgState.canEditVerification -> "Complete Verification"
+                            else -> "View status"
+                        },
+                        onAction = { onOpenVerification(orgState.canEditVerification) }
+                    )
+                }
+            }
+
             item {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OrgStatCard("Events", "${eventState.events.size}", Icons.Default.EmojiEvents, Modifier.weight(1f))
-                    OrgStatCard("Registered", "${eventState.events.sumOf { it.registeredCount }}", Icons.Default.People, Modifier.weight(1f))
-                    OrgStatCard("Revenue", "₹${(eventState.events.sumOf { it.fees * it.registeredCount } / 1000).toInt()}k", Icons.Default.AccountBalance, Modifier.weight(1f))
+                    OrgStatCard("Published", "${eventState.published.size}", Icons.Default.EmojiEvents, Modifier.weight(1f))
+                    OrgStatCard("Drafts", "${eventState.drafts.size}", Icons.Default.Drafts, Modifier.weight(1f))
+                    OrgStatCard("Registered", "${eventState.totalRegistered}", Icons.Default.People, Modifier.weight(1f))
                 }
             }
             item {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Active Events", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text("${eventState.events.size} events", color = AthlinkOrange, fontSize = 13.sp)
+                    Text("Your Events", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("${eventState.published.size} published", color = AthlinkOrange, fontSize = 13.sp)
                 }
             }
-            if (eventState.isLoading) {
+            eventState.error?.let { err -> item { Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) { ErrorCard(err) } } }
+            if (eventState.isLoading && eventState.published.isEmpty()) {
                 item { Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AthlinkOrange) } }
-            } else if (eventState.events.isEmpty()) {
+            } else if (eventState.published.isEmpty()) {
                 item {
-                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                        Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.EmojiEvents, null, tint = AthlinkMedGray, modifier = Modifier.size(48.dp))
-                            Spacer(Modifier.height(12.dp))
-                            Text("No events posted yet", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
+                    EmptyEventsCard(
+                        if (eventState.canPublish) "No events posted yet. Tap Post Event to publish your first one."
+                        else "No published events yet. You can prepare drafts now and publish once you're verified."
+                    )
                 }
             } else {
-                items(eventState.events) { event -> Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) { EventCard(event) } }
+                items(eventState.published, key = { it.id.ifBlank { "e${it.createdAt}${it.title}" } }) { event -> Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) { EventCard(event) } }
             }
+        }
+    }
+}
+
+@Composable
+private fun VerificationCtaCard(badge: OrganisationBadge, message: String, actionLabel: String, onAction: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = badge.accentColor().copy(alpha = 0.10f))
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(badge.icon(), null, tint = badge.accentColor(), modifier = Modifier.size(28.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(badge.title, fontWeight = FontWeight.Bold)
+                Text(message, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = onAction, colors = ButtonDefaults.buttonColors(containerColor = AthlinkOrange), shape = RoundedCornerShape(12.dp)) {
+                Text(actionLabel, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ErrorCard(message: String) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Text(message, modifier = Modifier.padding(14.dp), color = MaterialTheme.colorScheme.onErrorContainer, fontSize = 13.sp)
+    }
+}
+
+@Composable
+internal fun EmptyEventsCard(text: String) {
+    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Default.EmojiEvents, null, tint = AthlinkMedGray, modifier = Modifier.size(48.dp))
+            Spacer(Modifier.height(12.dp))
+            Text(text, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
     }
 }
@@ -108,7 +195,7 @@ private fun OrgStatCard(label: String, value: String, icon: androidx.compose.ui.
 }
 
 @Composable
-fun EventCard(event: Event) {
+fun EventCard(event: Event, footer: (@Composable () -> Unit)? = null) {
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(4.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -139,6 +226,7 @@ fun EventCard(event: Event) {
                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
                 color = AthlinkOrange, trackColor = AthlinkOrange.copy(0.15f)
             )
+            footer?.let { Spacer(Modifier.height(10.dp)); it() }
         }
     }
 }

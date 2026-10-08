@@ -23,7 +23,9 @@ fun AppTextField(
     isError: Boolean = false,
     errorMessage: String = "",
     singleLine: Boolean = true,
-    maxLines: Int = 1
+    maxLines: Int = 1,
+    enabled: Boolean = true,
+    supportingText: String? = null
 ) {
     OutlinedTextField(
         value = value,
@@ -35,9 +37,12 @@ fun AppTextField(
         visualTransformation = visualTransformation,
         keyboardOptions = keyboardOptions,
         isError = isError,
-        supportingText = if (isError && errorMessage.isNotEmpty()) {
-            { Text(errorMessage, color = MaterialTheme.colorScheme.error) }
-        } else null,
+        supportingText = when {
+            isError && errorMessage.isNotEmpty() -> { { Text(errorMessage, color = MaterialTheme.colorScheme.error) } }
+            supportingText != null -> { { Text(supportingText) } }
+            else -> null
+        },
+        enabled = enabled,
         singleLine = singleLine,
         maxLines = maxLines,
         shape = RoundedCornerShape(14.dp),

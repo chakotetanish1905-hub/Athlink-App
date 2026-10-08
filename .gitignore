@@ -25,3 +25,12 @@ app/google-services.json
 .DS_Store
 Thumbs.db
 _claude/
+
+# Node tooling (rules tests, admin tool)
+node_modules/
+firebase-debug.log
+firestore-debug.log
+storage-debug.log
+ui-debug.log
+# Service-account keys for tools/admin must never be committed
+*service-account*.json

@@ -1,0 +1,5 @@
+node_modules/
+# Never commit service account keys.
+*.json
+!package.json
+!package-lock.json

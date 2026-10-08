@@ -1,5 +1,14 @@
 package com.athlink.app.data.model
 
+/**
+ * A sports event. Published events live in `events/{id}` (readable by every signed-in user);
+ * an organisation's unpublished drafts live in `eventDrafts/{id}` (owner only) with the same shape.
+ * Only VERIFIED / OFFICIAL_GOVERNMENT organisations may write to `events` (enforced in firestore.rules).
+ *
+ * [organisationVerificationLevel] and [publishedByUid] were added with organisation verification;
+ * older event documents simply don't have them (defaults below), and rules check them against
+ * the organisation document so they can't be faked.
+ */
 data class Event(
     val id: String = "",
     val organisationId: String = "",
@@ -13,6 +22,9 @@ data class Event(
     val maxParticipants: Int = 0,
     val registeredCount: Int = 0,
     val imageUrl: String = "",
+    /** [OrganisationVerificationLevel] name copied from the organisation at publish time. */
+    val organisationVerificationLevel: String = "",
+    val publishedByUid: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
 

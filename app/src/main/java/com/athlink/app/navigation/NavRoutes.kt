@@ -27,7 +27,13 @@ object NavRoutes {
     const val ORG_EVENTS = "org_events"
     const val ORG_CREATE_EVENT = "org_create_event"
     const val ORG_PROFILE = "org_profile"
+    /** Start of the org graph: routes by verification status (onboarding / status / dashboard). */
+    const val ORG_GATE = "org_gate"
+    const val ORG_ONBOARDING = "org_onboarding"
+    const val ORG_VERIFICATION_STATUS = "org_verification_status"
+    const val ORG_EDIT_DRAFT = "org_edit_draft/{draftId}"
 
     fun playerBook(coachId: String) = "player_book/$coachId"
     fun chatThread(threadId: String, receiverName: String) = "player_chat_thread/$threadId/$receiverName"
+    fun orgEditDraft(draftId: String) = "org_edit_draft/$draftId"
 }

@@ -53,6 +53,7 @@ fun SignupScreen(
     // Coach-only fields (name/email/password above are shared by every role)
     var coachForm by remember { mutableStateOf(CoachRegistration()) }
     val isCoach = selectedRole == UserRole.COACH
+    val isOrganisation = selectedRole == UserRole.ORGANISATION
     val fieldErrors = if (isCoach) state.coachFieldErrors else emptyMap()
     fun clear(field: CoachField) = viewModel.clearCoachFieldError(field)
 
@@ -95,7 +96,8 @@ fun SignupScreen(
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
 
-                    AppTextField(name, { name = it; clear(CoachField.NAME) }, "Full Name", leadingIcon = Icons.Default.Person,
+                    AppTextField(name, { name = it; clear(CoachField.NAME) }, if (isOrganisation) "Organisation Name" else "Full Name",
+                        leadingIcon = if (isOrganisation) Icons.Default.Business else Icons.Default.Person,
                         isError = CoachField.NAME in fieldErrors, errorMessage = fieldErrors[CoachField.NAME].orEmpty(),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next))
                     Spacer(Modifier.height(14.dp))
@@ -142,6 +144,22 @@ fun SignupScreen(
                         RoleChip(Icons.Default.Business, "Organisation", selectedRole == UserRole.ORGANISATION) { selectedRole = UserRole.ORGANISATION; viewModel.clearError() }
                     }
 
+                    if (isOrganisation) {
+                        Spacer(Modifier.height(16.dp))
+                        Card(colors = CardDefaults.cardColors(containerColor = AthlinkBlueLight.copy(0.12f)), shape = RoundedCornerShape(12.dp)) {
+                            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+                                Icon(Icons.Default.VerifiedUser, null, tint = AthlinkBlueLight, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Next, you'll verify your organisation (registration, authorised representative and sports " +
+                                        "credentials). You can save event drafts straight away; publishing public events " +
+                                        "unlocks once Athlink has verified you.",
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+
                     if (isCoach) {
                         Spacer(Modifier.height(24.dp))
                         CoachProfileSection(
@@ -166,12 +184,18 @@ fun SignupScreen(
 
                     val isValid = name.isNotEmpty() && email.isNotEmpty() && password.isNotEmpty() && password == confirmPassword
                     PrimaryButton(
-                        text = if (isCoach) "Register as Coach" else "Create Account",
+                        text = when {
+                            isCoach -> "Register as Coach"
+                            isOrganisation -> "Register Organisation"
+                            else -> "Create Account"
+                        },
                         onClick = {
                             if (isCoach) {
                                 viewModel.registerCoach(
                                     coachForm.copy(name = name, email = email, password = password, confirmPassword = confirmPassword)
                                 )
+                            } else if (isOrganisation) {
+                                viewModel.registerOrganisation(name, email, password)
                             } else {
                                 viewModel.register(name, email, password, selectedRole)
                             }

@@ -1,0 +1,67 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Athlink Cloud Storage security rules.
+//
+// Private verification documents are readable ONLY by their owner and admins and are never
+// served through a public URL. Uploads are limited by type and size, and are blocked while the
+// organisation's verification is locked (under review / verified / suspended). That check reads
+// Firestore (cross-service rules), which needs a one-time permission grant in the Firebase console.
+// ─────────────────────────────────────────────────────────────────────────────
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() { return request.auth != null; }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function isDocument() {
+      return request.resource.contentType.matches('(application/pdf|image/jpeg|image/png)');
+    }
+    function isImage() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+    function underMb(n) { return request.resource.size > 0 && request.resource.size <= n * 1024 * 1024; }
+
+    function orgPath(orgId) { return /databases/(default)/documents/organisations/$(orgId); }
+    function orgEditable(orgId) {
+      let o = firestore.get(orgPath(orgId)).data;
+      return o.verificationStatus in ['UNVERIFIED', 'CONTACT_VERIFIED', 'REJECTED', 'EXPIRED']
+        || (o.verificationStatus in ['VERIFIED', 'OFFICIAL_GOVERNMENT']
+            && o.get('verificationExpiresAt', null) != null
+            && o.verificationExpiresAt <= request.time);
+    }
+
+    // ── Organisation verification documents (PRIVATE) ──────────────────────
+    match /organisation_documents/{orgId}/{documentId}/{fileName} {
+      allow read: if isSelf(orgId) || isAdmin();
+      // New files only (no silent overwrite of something already submitted).
+      allow create: if isSelf(orgId)
+        && underMb(5) && isDocument()
+        && firestore.exists(orgPath(orgId))
+        && orgEditable(orgId);
+      allow update: if false;
+      allow delete: if isSelf(orgId) && firestore.exists(orgPath(orgId)) && orgEditable(orgId);
+    }
+
+    // ── Organisation logo (PUBLIC to signed-in users) ──────────────────────
+    match /organisation_logos/{orgId}/logo {
+      allow read: if signedIn();
+      allow create, update: if isSelf(orgId) && underMb(2) && isImage();
+      allow delete: if isSelf(orgId);
+    }
+
+    // ── Coach assets (paths from the coach upgrade plan) ───────────────────
+    match /coaches/{uid}/public/profile.jpg {
+      allow read: if signedIn();
+      allow create, update: if isSelf(uid) && underMb(2) && isImage();
+      allow delete: if isSelf(uid);
+    }
+    match /coachVerification/{uid}/{allPaths=**} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow create, update: if isSelf(uid) && underMb(5) && isDocument();
+      allow delete: if isSelf(uid);
+    }
+
+    // Everything else is denied by default.
+  }
+}

@@ -113,6 +113,27 @@ class AuthViewModel @Inject constructor(
         return true
     }
 
+    /**
+     * Creates an organisation account: Auth user + `users/{uid}` + an UNVERIFIED
+     * `organisations/{uid}`. The organisation is then routed into onboarding / verification.
+     */
+    fun registerOrganisation(name: String, email: String, password: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true, error = null)
+            authRepository.registerOrganisation(name, email, password)
+                .onSuccess { user -> _state.value = AuthState(user = user, isLoggedIn = true) }
+                .onFailure { e ->
+                    _state.value = AuthState(error = when (e) {
+                        is FirebaseAuthUserCollisionException -> "An account with this email already exists"
+                        is FirebaseAuthWeakPasswordException -> "Password is too weak (use at least 6 characters)"
+                        is FirebaseAuthInvalidCredentialsException -> "Enter a valid email address"
+                        is FirebaseNetworkException -> "No internet connection. Please try again."
+                        else -> "Registration failed. Please try again."
+                    })
+                }
+        }
+    }
+
     /** Clears the error shown under a coach form field once the user edits it. */
     fun clearCoachFieldError(field: CoachField) {
         val current = _state.value.coachFieldErrors

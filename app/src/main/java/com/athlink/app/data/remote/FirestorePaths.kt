@@ -19,6 +19,18 @@ object FirestorePaths {
     const val COACH_VERIFICATION = "coachVerification"  // coachVerification/{uid}
     const val ADMIN = "admin"                           // coachVerification/{uid}/admin/review
     const val REVIEW_DOC = "review"
+
+    // ── Organisation (organisationId == owner uid) ──────────────────────
+    const val ORGANISATIONS = "organisations"                              // public profile + admin-only status
+    const val ORGANISATION_VERIFICATION = "organisationVerification"       // private legal / contact evidence
+    const val ORGANISATION_REPRESENTATIVES = "organisationRepresentatives" // private, id = organisationId
+    const val ORGANISATION_AFFILIATIONS = "organisationAffiliations"       // private, id = organisationId
+    const val ORGANISATION_DOCUMENTS = "organisationDocuments"             // private metadata, auto id
+    const val VERIFICATION_AUDIT_LOGS = "verificationAuditLogs"            // append-only
+
+    // ── Events ──────────────────────────────────────────────────────────
+    const val EVENTS = "events"              // published (verified organisations only)
+    const val EVENT_DRAFTS = "eventDrafts"   // private drafts (owner only)
 }
 
 /** Cloud Storage paths. Public and private assets are under different roots. */
@@ -32,4 +44,11 @@ object StoragePaths {
         "coachVerification/$uid/qualifications/$qualificationId/$fileName"
     fun safeguardingDocument(uid: String, kind: String, fileName: String) =
         "coachVerification/$uid/safeguarding/$kind/$fileName"
+
+    /** PRIVATE (owner + admin only): organisation verification documents. Never given a public URL. */
+    fun organisationDocument(organisationId: String, documentId: String, fileName: String) =
+        "organisation_documents/$organisationId/$documentId/$fileName"
+
+    /** PUBLIC (any signed-in user can read): organisation logo. */
+    fun organisationLogo(organisationId: String) = "organisation_logos/$organisationId/logo"
 }

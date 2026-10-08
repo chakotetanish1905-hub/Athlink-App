@@ -22,6 +22,9 @@ class AuthRepository @Inject constructor(
     suspend fun registerCoach(registration: CoachRegistration): Result<User> =
         authSource.signUpCoach(registration)
 
+    suspend fun registerOrganisation(name: String, email: String, password: String): Result<User> =
+        authSource.signUpOrganisation(name, email, password)
+
     fun logout() = authSource.signOut()
 
     suspend fun getCurrentUser(): Result<User> = authSource.getCurrentUserData()

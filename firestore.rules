@@ -1,0 +1,416 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Athlink Firestore security rules.
+//
+// Replaces the development rule `allow read, write: if request.auth != null`.
+//
+// Core principle: ROLE ≠ VERIFICATION. `users/{uid}.role == ORGANISATION` grants no trust.
+// Organisation trust (verificationStatus / verificationLevel on organisations/{id}) can only be
+// raised by an admin through the Admin SDK (tools/admin), which bypasses these rules.
+// The app can make exactly two status moves, both checked here:
+//   UNVERIFIED -> CONTACT_VERIFIED              (needs request.auth.token.email_verified)
+//   editable   -> UNDER_REVIEW (submit)          (needs email_verified)
+//
+// Mirrors: OrganisationVerificationPolicy.kt / CoachVerificationPolicy.kt / tools/admin/policy.js.
+// Tests:   tests/rules/firestore.rules.test.js
+// ─────────────────────────────────────────────────────────────────────────────
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function signedIn() { return request.auth != null; }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function emailVerified() { return signedIn() && request.auth.token.email_verified == true; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function changedKeys() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function unchanged(keys) { return !changedKeys().hasAny(keys); }
+    function path(col, id) { return /databases/$(database)/documents/$(col)/$(id); }
+
+    function roleAfter(uid) { return getAfter(path('users', uid)).data.role; }
+    function roleOf(uid) { return get(path('users', uid)).data.role; }
+    function isOrganisationAccount() {
+      return signedIn() && exists(path('users', request.auth.uid)) && roleOf(request.auth.uid) == 'ORGANISATION';
+    }
+
+    // ── Organisation status helpers ──────────────────────────────────────────
+    function trustedStatuses() { return ['VERIFIED', 'OFFICIAL_GOVERNMENT']; }
+    function editableStatuses() { return ['UNVERIFIED', 'CONTACT_VERIFIED', 'REJECTED', 'EXPIRED']; }
+    function allStatuses() {
+      return ['UNVERIFIED', 'CONTACT_VERIFIED', 'UNDER_REVIEW', 'VERIFIED', 'OFFICIAL_GOVERNMENT', 'REJECTED', 'SUSPENDED', 'EXPIRED'];
+    }
+    function expiredByDate(o) {
+      return o.get('verificationExpiresAt', null) != null && o.verificationExpiresAt <= request.time;
+    }
+    // Owner may edit evidence / submit: editable status, or a trusted status past its expiry date.
+    function orgEditableData(o) {
+      return o.verificationStatus in editableStatuses()
+        || (o.verificationStatus in trustedStatuses() && expiredByDate(o));
+    }
+    function orgEditable(orgId) {
+      return exists(path('organisations', orgId)) && orgEditableData(get(path('organisations', orgId)).data);
+    }
+    function orgEditableAfter(orgId) {
+      return existsAfter(path('organisations', orgId)) && orgEditableData(getAfter(path('organisations', orgId)).data);
+    }
+    function orgCanPublishData(o) {
+      return o.verificationStatus in trustedStatuses()
+        && o.verificationLevel in ['LEVEL_2_ORGANISATION_VERIFIED', 'LEVEL_3_OFFICIAL_GOVERNMENT']
+        && !expiredByDate(o);
+    }
+    function orgNotSuspended(orgId) {
+      return !exists(path('organisations', orgId))
+        || get(path('organisations', orgId)).data.verificationStatus != 'SUSPENDED';
+    }
+
+    // ── Admin: read-only access to everything for review tooling. Admin WRITES go through the
+    //    Admin SDK (server-side), never through client rules. ────────────────────────────────
+    match /{document=**} {
+      allow read: if isAdmin();
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // users/{uid}: shared account record. Role is fixed at signup.
+    // ═════════════════════════════════════════════════════════════════════════
+    match /users/{uid} {
+      allow read: if isSelf(uid);
+      allow create: if isSelf(uid)
+        && incoming().uid == uid
+        && incoming().role in ['PLAYER', 'COACH', 'ORGANISATION']
+        && (incoming().get('organisationId', '') == ''
+            || (incoming().role == 'ORGANISATION' && incoming().organisationId == uid));
+      allow update: if isSelf(uid)
+        && unchanged(['uid', 'role', 'createdAt'])
+        && (unchanged(['organisationId'])
+            || (existing().role == 'ORGANISATION'
+                && existing().get('organisationId', '') == ''
+                && incoming().organisationId == uid));
+      allow delete: if false;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // ORGANISATIONS
+    // organisationId == owner uid (one organisation per account, impersonation-proof).
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function validOrgPublic(d) {
+      return d.organisationId is string && d.ownerUid is string
+        && d.legalName is string && d.legalName.size() <= 120
+        && d.displayName is string && d.displayName.size() <= 120
+        && d.organisationType is string && d.organisationType.size() <= 40
+        && d.sports is list && d.sports.size() <= 20
+        && d.description is string && d.description.size() <= 600
+        && d.website is string && d.website.size() <= 200
+        && d.publicAddress is string && d.publicAddress.size() <= 150;
+    }
+
+    match /organisations/{orgId} {
+      // Public profile: any signed-in user (players see who runs an event).
+      allow read: if signedIn();
+
+      allow create: if isSelf(orgId)
+        && roleAfter(orgId) == 'ORGANISATION'
+        && incoming().organisationId == orgId
+        && incoming().ownerUid == orgId
+        && incoming().verificationStatus == 'UNVERIFIED'
+        && incoming().verificationLevel == 'LEVEL_0_UNVERIFIED'
+        && incoming().verifiedAt == null
+        && incoming().verificationExpiresAt == null
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && validOrgPublic(incoming());
+
+      allow update: if isSelf(orgId)
+        && incoming().updatedAt == request.time
+        && unchanged(['organisationId', 'ownerUid', 'createdAt', 'verifiedAt', 'verificationExpiresAt'])
+        && validOrgPublic(incoming())
+        && (
+          // (a) Profile edit, no status change. Identity / location fields are locked unless
+          //     verification is editable; description, website and logo can always change.
+          (unchanged(['verificationStatus', 'verificationLevel'])
+            && (orgEditableData(existing())
+                || changedKeys().hasOnly(['description', 'website', 'logoUrl', 'updatedAt'])))
+          // (b) Contact verified: UNVERIFIED -> CONTACT_VERIFIED, level 1, token says email_verified.
+          || (existing().verificationStatus == 'UNVERIFIED'
+            && incoming().verificationStatus == 'CONTACT_VERIFIED'
+            && incoming().verificationLevel == 'LEVEL_1_CONTACT_VERIFIED'
+            && emailVerified()
+            && changedKeys().hasOnly(['verificationStatus', 'verificationLevel', 'updatedAt']))
+          // (c) Submit for review: editable -> UNDER_REVIEW, level 1, email verified, and the
+          //     private verification record moves to UNDER_REVIEW in the same batch.
+          || (orgEditableData(existing())
+            && incoming().verificationStatus == 'UNDER_REVIEW'
+            && incoming().verificationLevel == 'LEVEL_1_CONTACT_VERIFIED'
+            && emailVerified()
+            && getAfter(path('organisationVerification', orgId)).data.status == 'UNDER_REVIEW'
+            && getAfter(path('organisationVerification', orgId)).data.submittedAt == request.time)
+        );
+
+      allow delete: if false;
+    }
+
+    // Private legal / contact evidence. Check flags, review fields and rejection reason: admin only.
+    match /organisationVerification/{orgId} {
+      allow read: if isSelf(orgId);
+
+      allow create: if isSelf(orgId)
+        && incoming().verificationId == orgId
+        && incoming().organisationId == orgId
+        && incoming().ownerUid == orgId
+        && incoming().contactVerified == false
+        && incoming().legalEntityVerified == false
+        && incoming().representativeVerified == false
+        && incoming().addressVerified == false
+        && incoming().sportsCredentialVerified == false
+        && incoming().status == 'UNVERIFIED'
+        && incoming().verificationLevel == 'LEVEL_0_UNVERIFIED'
+        && incoming().submittedAt == null
+        && incoming().reviewedAt == null
+        && incoming().reviewedBy == null
+        && incoming().reviewNotes == null
+        && incoming().rejectionReason == null
+        && incoming().updatedAt == request.time
+        && orgEditableAfter(orgId);
+
+      allow update: if isSelf(orgId)
+        && incoming().updatedAt == request.time
+        && unchanged(['verificationId', 'organisationId', 'ownerUid',
+                      'contactVerified', 'legalEntityVerified', 'representativeVerified',
+                      'addressVerified', 'sportsCredentialVerified',
+                      'reviewedAt', 'reviewedBy', 'reviewNotes', 'rejectionReason'])
+        && orgEditable(orgId)
+        && (
+          unchanged(['status', 'verificationLevel', 'submittedAt'])
+          // Status mirror may only follow the organisation document's (rule-checked) transition.
+          || (incoming().status == getAfter(path('organisations', orgId)).data.verificationStatus
+            && incoming().verificationLevel == getAfter(path('organisations', orgId)).data.verificationLevel
+            && ((incoming().status == 'CONTACT_VERIFIED' && unchanged(['submittedAt']))
+                || (incoming().status == 'UNDER_REVIEW' && incoming().submittedAt == request.time)))
+        );
+
+      allow delete: if false;
+    }
+
+    // Authorised representative (id == organisationId). verificationStatus is admin-only.
+    match /organisationRepresentatives/{orgId} {
+      allow read: if isSelf(orgId);
+      allow create: if isSelf(orgId)
+        && incoming().representativeId == orgId
+        && incoming().organisationId == orgId
+        && incoming().ownerUid == orgId
+        && incoming().verificationStatus == 'PENDING_MANUAL_REVIEW'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && incoming().fullName is string && incoming().fullName.size() <= 80
+        && orgEditableAfter(orgId);
+      allow update: if isSelf(orgId)
+        && unchanged(['representativeId', 'organisationId', 'ownerUid', 'verificationStatus', 'createdAt'])
+        && incoming().updatedAt == request.time
+        && incoming().fullName is string && incoming().fullName.size() <= 80
+        && orgEditable(orgId);
+      allow delete: if false;
+    }
+
+    // Sports affiliation / recognition claim (id == organisationId). verificationStatus admin-only.
+    match /organisationAffiliations/{orgId} {
+      allow read: if isSelf(orgId);
+      allow create: if isSelf(orgId)
+        && incoming().affiliationId == orgId
+        && incoming().organisationId == orgId
+        && incoming().ownerUid == orgId
+        && incoming().verificationStatus == 'PENDING_MANUAL_REVIEW'
+        && incoming().updatedAt == request.time
+        && orgEditableAfter(orgId);
+      allow update: if isSelf(orgId)
+        && unchanged(['affiliationId', 'organisationId', 'ownerUid', 'verificationStatus'])
+        && incoming().updatedAt == request.time
+        && orgEditable(orgId);
+      allow delete: if false;
+    }
+
+    // Document metadata. The file is private in Storage. Review fields are admin-only.
+    match /organisationDocuments/{documentId} {
+      function documentTypes() {
+        return ['REGISTRATION_CERTIFICATE', 'INCORPORATION_CERTIFICATE', 'PAN_DOCUMENT', 'GST_DOCUMENT',
+                'ADDRESS_PROOF', 'AUTHORIZATION_LETTER', 'GOVERNMENT_ORDER', 'SPORTS_AFFILIATION',
+                'SPORTS_LICENSE', 'ACCREDITATION', 'SPORTS_RECOGNITION', 'OTHER_SUPPORTING_DOCUMENT'];
+      }
+      allow read: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow create: if signedIn()
+        && incoming().documentId == documentId
+        && incoming().ownerUid == request.auth.uid
+        && incoming().organisationId == request.auth.uid
+        && incoming().documentType in documentTypes()
+        && incoming().storagePath.matches('organisation_documents/' + request.auth.uid + '/' + documentId + '/[^/]+')
+        && incoming().mimeType in ['application/pdf', 'image/jpeg', 'image/png']
+        && incoming().sizeBytes is int && incoming().sizeBytes <= 5 * 1024 * 1024
+        && incoming().verificationStatus == 'PENDING_MANUAL_REVIEW'
+        && incoming().reviewedAt == null
+        && incoming().reviewedBy == null
+        && incoming().reviewNotes == null
+        && incoming().uploadedAt == request.time
+        && orgEditable(request.auth.uid);
+      allow update: if signedIn()
+        && existing().ownerUid == request.auth.uid
+        && changedKeys().hasOnly(['documentNumber', 'issuingAuthority', 'issuedDate', 'expiryDate'])
+        && orgEditable(request.auth.uid);
+      allow delete: if signedIn()
+        && existing().ownerUid == request.auth.uid
+        && orgEditable(request.auth.uid);
+    }
+
+    // Append-only audit trail. Admin decisions are written by the Admin SDK. The app may only
+    // append its OWN submission / upload records, validated field by field; nobody can edit them.
+    match /verificationAuditLogs/{logId} {
+      allow read: if false; // admins read via the catch-all admin rule above
+      allow create: if signedIn()
+        && incoming().keys().hasOnly(['logId', 'organisationId', 'action', 'previousStatus', 'newStatus',
+                                      'performedBy', 'performedAt', 'reason', 'notes', 'source'])
+        && incoming().logId == logId
+        && incoming().organisationId == request.auth.uid
+        && incoming().performedBy == request.auth.uid
+        && incoming().performedAt == request.time
+        && incoming().source == 'APP'
+        && incoming().reason == ''
+        && incoming().notes is string && incoming().notes.size() <= 200
+        && (
+          (incoming().action in ['SUBMITTED', 'RESUBMITTED']
+            && incoming().previousStatus in allStatuses()
+            && incoming().newStatus == 'UNDER_REVIEW'
+            && getAfter(path('organisations', request.auth.uid)).data.verificationStatus == 'UNDER_REVIEW')
+          || (incoming().action == 'DOCUMENT_UPLOADED'
+            && incoming().previousStatus == '' && incoming().newStatus == ''
+            && existsAfter(path('organisationDocuments', incoming().notes.split(':')[1])))
+        );
+      allow update, delete: if false;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // EVENTS
+    // Published events: only VERIFIED / OFFICIAL_GOVERNMENT, unexpired, level >= 2 organisations,
+    // under their own id and their CURRENT public name / level. Existing event documents stay readable.
+    // ═════════════════════════════════════════════════════════════════════════
+    match /events/{eventId} {
+      allow read: if signedIn();
+      allow create: if isOrganisationAccount()
+        && incoming().id == eventId
+        && incoming().organisationId == request.auth.uid
+        && incoming().publishedByUid == request.auth.uid
+        && exists(path('organisations', request.auth.uid))
+        && orgCanPublishData(get(path('organisations', request.auth.uid)).data)
+        && incoming().organisationName == get(path('organisations', request.auth.uid)).data.displayName
+        && incoming().organisationVerificationLevel == get(path('organisations', request.auth.uid)).data.verificationLevel
+        && incoming().registeredCount == 0
+        && incoming().title is string && incoming().title.size() > 0 && incoming().title.size() <= 120;
+      allow update: if signedIn()
+        && existing().organisationId == request.auth.uid
+        && exists(path('organisations', request.auth.uid))
+        && orgCanPublishData(get(path('organisations', request.auth.uid)).data)
+        && unchanged(['id', 'organisationId', 'organisationName', 'organisationVerificationLevel',
+                      'publishedByUid', 'registeredCount', 'createdAt']);
+      allow delete: if signedIn() && existing().organisationId == request.auth.uid;
+    }
+
+    // Private drafts: any organisation account except a suspended one.
+    match /eventDrafts/{draftId} {
+      allow read: if signedIn() && resource.data.organisationId == request.auth.uid;
+      allow create: if isOrganisationAccount()
+        && incoming().id == draftId
+        && incoming().organisationId == request.auth.uid
+        && orgNotSuspended(request.auth.uid);
+      allow update: if isOrganisationAccount()
+        && existing().organisationId == request.auth.uid
+        && incoming().organisationId == request.auth.uid
+        && incoming().id == draftId
+        && orgNotSuspended(request.auth.uid);
+      allow delete: if signedIn() && existing().organisationId == request.auth.uid;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // COACHES (kept compatible with the current app; status fields are admin-only)
+    // ═════════════════════════════════════════════════════════════════════════
+    function coachAdminFields() {
+      return ['verificationLevel', 'identityStatus', 'qualificationStatus', 'experienceStatus',
+              'safeguardingStatus', 'rating', 'reviewCount', 'totalEarnings', 'verifiedAt', 'expiresAt'];
+    }
+    match /coaches/{uid} {
+      allow read: if signedIn();
+      allow create: if isSelf(uid)
+        && roleAfter(uid) == 'COACH'
+        && incoming().uid == uid
+        && incoming().verificationStatus in ['NOT_SUBMITTED', 'PENDING']
+        && incoming().get('profileStatus', 'DRAFT') == 'DRAFT'
+        && incoming().get('verificationLevel', 'LEVEL_0_REGISTERED') == 'LEVEL_0_REGISTERED'
+        && incoming().get('rating', 0) == 0
+        && incoming().get('reviewCount', 0) == 0
+        && incoming().get('totalEarnings', 0) == 0;
+      allow update: if isSelf(uid)
+        && unchanged(['uid'] + coachAdminFields())
+        && (unchanged(['verificationStatus'])
+            || (existing().verificationStatus in ['NOT_SUBMITTED', 'PENDING', 'ACTION_REQUIRED', 'REJECTED', 'EXPIRED']
+                && incoming().verificationStatus == 'UNDER_REVIEW'))
+        && (unchanged(['profileStatus'])
+            || (existing().get('profileStatus', 'DRAFT') == 'DRAFT' && incoming().profileStatus == 'SUBMITTED')
+            || (existing().get('profileStatus', 'DRAFT') == 'ACTIVE' && incoming().profileStatus == 'DEACTIVATED')
+            || (existing().get('profileStatus', 'DRAFT') == 'DEACTIVATED' && incoming().profileStatus == 'ACTIVE'
+                && existing().verificationStatus == 'VERIFIED'));
+      allow delete: if false;
+
+      // qualifications / services / availability: public; references: owner only.
+      match /{sub}/{itemId} {
+        allow read: if signedIn() && (sub != 'references' || isSelf(uid));
+        allow create: if isSelf(uid)
+          && incoming().get('verificationStatus', 'NOT_SUBMITTED') in ['NOT_SUBMITTED', 'PENDING']
+          && incoming().get('status', 'NOT_SUBMITTED') in ['NOT_SUBMITTED', 'PENDING'];
+        allow update: if isSelf(uid)
+          && (unchanged(['verificationStatus']) || incoming().verificationStatus in ['NOT_SUBMITTED', 'PENDING'])
+          && (unchanged(['status']) || incoming().status in ['NOT_SUBMITTED', 'PENDING'])
+          && unchanged(['verifiedAt', 'verifiedBy', 'rejectionReason']);
+        allow delete: if isSelf(uid);
+      }
+    }
+
+    match /coachPrivate/{uid} {
+      allow read, create, update: if isSelf(uid);
+      allow delete: if false;
+    }
+
+    match /coachVerification/{uid} {
+      allow read: if isSelf(uid);
+      allow create, update: if isSelf(uid)
+        && incoming().get('actionRequiredMessage', '') == (resource == null ? '' : existing().get('actionRequiredMessage', ''))
+        && incoming().get('rejectionReason', '') == (resource == null ? '' : existing().get('rejectionReason', ''))
+        && incoming().get('reviewedAt', null) == (resource == null ? null : existing().get('reviewedAt', null));
+      allow delete: if false;
+      match /admin/{doc} {
+        allow read, write: if false; // admin-only via Admin SDK
+      }
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // SESSIONS (bookings) and CHAT
+    // ═════════════════════════════════════════════════════════════════════════
+    match /sessions/{sessionId} {
+      allow read: if signedIn()
+        && (resource.data.playerId == request.auth.uid || resource.data.coachId == request.auth.uid);
+      allow create: if signedIn()
+        && incoming().playerId == request.auth.uid
+        && incoming().status == 'PENDING';
+      allow update: if signedIn()
+        && (existing().coachId == request.auth.uid || existing().playerId == request.auth.uid)
+        && changedKeys().hasOnly(['status']);
+      allow delete: if false;
+    }
+
+    // threadId = "{playerUid}_{coachUid}"; only the two participants can read / write.
+    match /chats/{threadId}/messages/{messageId} {
+      allow read: if signedIn() && request.auth.uid in threadId.split('_');
+      allow create: if signedIn()
+        && request.auth.uid in threadId.split('_')
+        && incoming().senderId == request.auth.uid;
+      allow update, delete: if false;
+    }
+  }
+}

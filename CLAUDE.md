@@ -47,17 +47,12 @@ JVM unit tests live in `app/src/test` (JUnit 4) and cover the pure-Kotlin coach 
 - New screen: add the composable under `ui/screens/<role>/`, add a route constant (and helper if parameterized) in `NavRoutes.kt`, wire a `composable(...)` entry into the relevant nav graph in `AthlinkNavHost.kt`, and add/extend a `@HiltViewModel` in `viewmodel/` if it needs state.
 - New Firestore collection: add the model in `data/model/`, add CRUD methods to `FirestoreSource.kt`, wrap them in a repository under `data/repository/` (consider the dummy-data fallback pattern above), and inject the repository into the relevant ViewModel.
 
+**Organisation verification (ROLE ≠ VERIFICATION):** an ORGANISATION account gets trust only from `organisations/{uid}.verificationStatus/verificationLevel`, which only the admin tool (`tools/admin`, Admin SDK) can raise. Rules for every transition live in `OrganisationVerificationPolicy.kt`, `firestore.rules` and `tools/admin/policy.js`; change all three together. Per-type fields/documents come from `OrganisationRequirements.kt`. The org nav graph starts at `org_gate`, which routes by status. Organisation screens use real Firestore data only (no dummy fallback). Full write-up: `docs/organisation-verification/ORG_VERIFICATION_REPORT.md`.
+
 ## Firebase setup
 
-`app/google-services.json` must correspond to a Firebase project for package `com.athlink.app` with Email/Password Auth, Firestore, and Storage enabled. Development Firestore rules used by this project:
+`app/google-services.json` must correspond to a Firebase project for package `com.athlink.app` with Email/Password Auth, Firestore, and Storage enabled (Storage requires the Blaze plan).
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-```
+Security rules are versioned in the repo: `firestore.rules`, `storage.rules`, `firestore.indexes.json` (deploy with `firebase deploy --only firestore:rules,firestore:indexes,storage`). The old development rule (`allow read, write: if request.auth != null`) must not be used any more. Rules tests: `cd tests/rules && npm install && npm run emulators:test` (needs Java 21). Admin tasks (grant admin claim, approve/reject/suspend organisations, expire-due, migrate-legacy): `tools/admin/admin.js help`.
+
+CI (`.github/workflows/ci.yml`) runs `testDebugUnitTest`, `assembleDebug` (with a dummy google-services.json) and the rules tests on every push.

@@ -52,15 +52,10 @@ class OrganisationViewModel @Inject constructor(
     private val _state = MutableStateFlow(OrganisationState())
     val state: StateFlow<OrganisationState> = _state.asStateFlow()
 
-    private var loadedFor: String? = null
-
-    fun load(user: User) {
-        if (loadedFor == user.uid && _state.value.error == null && _state.value.loaded) return
-        refresh(user)
-    }
+    /** Called whenever a screen is shown: verification status can change at any time (admin review). */
+    fun load(user: User) = refresh(user)
 
     fun refresh(user: User) {
-        loadedFor = user.uid
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
             val emailVerified = repository.refreshEmailVerified().getOrDefault(repository.isEmailVerified)

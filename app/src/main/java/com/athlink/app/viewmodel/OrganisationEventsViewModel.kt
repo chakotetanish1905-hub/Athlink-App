@@ -59,8 +59,8 @@ class OrganisationEventsViewModel @Inject constructor(
     private var user: User? = null
     private val orgId get() = user?.let { it.organisationId.ifBlank { it.uid } }.orEmpty()
 
+    /** Called whenever a screen is shown, so returning from create / publish shows fresh data. */
     fun load(user: User) {
-        if (this.user?.uid == user.uid && _state.value.error == null && _state.value.organisation != null) return
         this.user = user
         refresh()
     }

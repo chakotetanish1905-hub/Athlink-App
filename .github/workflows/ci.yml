@@ -57,4 +57,16 @@ jobs:
         run: npm ci && npm test
       - name: Rules tests
         working-directory: tests/rules
-        run: npm ci && npm run emulators:test
+        shell: bash
+        run: |
+          npm ci
+          npm run emulators:test 2>&1 | tee rules-output.txt
+          exit ${PIPESTATUS[0]}
+      - name: Report rules failures as an annotation
+        if: failure()
+        working-directory: tests/rules
+        shell: bash
+        run: |
+          [ -f rules-output.txt ] || exit 0
+          msg=$(grep -vE '^\s+at |^\s*$' rules-output.txt | tail -200 | cut -c1-300 | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Rules test output::${msg}"

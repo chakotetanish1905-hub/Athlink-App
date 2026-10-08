@@ -21,8 +21,8 @@ service cloud.firestore {
     // ── Helpers ──────────────────────────────────────────────────────────────
     function signedIn() { return request.auth != null; }
     function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
-    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
-    function emailVerified() { return signedIn() && request.auth.token.email_verified == true; }
+    function isAdmin() { return signedIn() && request.auth.token.get('admin', false) == true; }
+    function emailVerified() { return signedIn() && request.auth.token.get('email_verified', false) == true; }
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     function changedKeys() { return request.resource.data.diff(resource.data).affectedKeys(); }
@@ -347,7 +347,7 @@ service cloud.firestore {
         && incoming().get('reviewCount', 0) == 0
         && incoming().get('totalEarnings', 0) == 0;
       allow update: if isSelf(uid)
-        && unchanged(['uid'] + coachAdminFields())
+        && unchanged(coachAdminFields().concat(['uid']))
         && (unchanged(['verificationStatus'])
             || (existing().verificationStatus in ['NOT_SUBMITTED', 'PENDING', 'ACTION_REQUIRED', 'REJECTED', 'EXPIRED']
                 && incoming().verificationStatus == 'UNDER_REVIEW'))

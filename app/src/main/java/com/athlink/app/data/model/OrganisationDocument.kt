@@ -4,9 +4,9 @@ import java.util.Date
 
 /**
  * Metadata for one uploaded verification document: `organisationDocuments/{documentId}`.
- * The file itself is in PRIVATE Cloud Storage at [storagePath]
- * (`organisation_documents/{organisationId}/{documentId}/{fileName}`) and is never exposed through
- * a public download URL. Readable by the owner and admins only.
+ * The file itself is stored privately in Firestore as `organisationDocuments/{id}/chunks/{n}`
+ * (see [DocumentChunks]; works on the free Spark plan) and is never exposed through a public URL.
+ * Readable by the owner and admins only.
  *
  * The owner writes the descriptive fields; [verificationStatus], [reviewedAt], [reviewedBy] and
  * [reviewNotes] are admin-only (enforced in firestore.rules).
@@ -19,6 +19,10 @@ data class OrganisationDocument(
     /** [OrganisationDocumentType] name. */
     val documentType: String = "",
     val storagePath: String = "",
+    /** "FIRESTORE" (chunked, Spark plan) or "" for Cloud Storage. See [DocumentChunks]. */
+    val storageBackend: String = "",
+    /** Number of `chunks/{n}` documents holding the bytes (Firestore backend). */
+    val chunkCount: Int = 0,
     val fileName: String = "",
     val mimeType: String = "",
     val sizeBytes: Long = 0L,

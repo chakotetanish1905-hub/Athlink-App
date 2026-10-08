@@ -15,8 +15,8 @@ object OrganisationValidators {
     const val MAX_DESCRIPTION = 500
     const val EARLIEST_YEAR = 1800
     const val MAX_COUNT = 1_000_000
-    const val MAX_DOCUMENT_BYTES = 5L * 1024 * 1024
-    const val MAX_LOGO_BYTES = 2L * 1024 * 1024
+    const val MAX_DOCUMENT_BYTES = DocumentChunks.MAX_STORED_BYTES
+    const val MAX_LOGO_BYTES = 10L * 1024 * 1024 // compressed to a small thumbnail before saving
 
     val DOCUMENT_MIME_TYPES = setOf("application/pdf", "image/jpeg", "image/png")
     val LOGO_MIME_TYPES = setOf("image/jpeg", "image/png", "image/webp")
@@ -164,10 +164,15 @@ object OrganisationValidators {
         }
     }
 
+    /**
+     * Pre-upload check. PDFs must fit as-is; photos may be bigger because they are compressed
+     * before storing (see DocumentChunks).
+     */
     fun document(mimeType: String?, sizeBytes: Long): String? = when {
         mimeType == null || mimeType !in DOCUMENT_MIME_TYPES -> "Upload a PDF, JPG or PNG file"
-        sizeBytes <= 0 -> "The file is empty"
-        sizeBytes > MAX_DOCUMENT_BYTES -> "File must be under ${MAX_DOCUMENT_BYTES / (1024 * 1024)} MB"
+        sizeBytes == 0L -> "The file is empty"
+        mimeType == "application/pdf" && sizeBytes > MAX_DOCUMENT_BYTES -> "PDF must be under ${MAX_DOCUMENT_BYTES / (1024 * 1024)} MB"
+        sizeBytes > DocumentChunks.MAX_RAW_IMAGE_BYTES -> "Image is too large (max ${DocumentChunks.MAX_RAW_IMAGE_BYTES / (1024 * 1024)} MB)"
         else -> null
     }
 

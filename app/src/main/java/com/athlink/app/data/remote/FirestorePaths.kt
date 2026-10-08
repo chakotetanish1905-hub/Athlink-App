@@ -26,6 +26,7 @@ object FirestorePaths {
     const val ORGANISATION_REPRESENTATIVES = "organisationRepresentatives" // private, id = organisationId
     const val ORGANISATION_AFFILIATIONS = "organisationAffiliations"       // private, id = organisationId
     const val ORGANISATION_DOCUMENTS = "organisationDocuments"             // private metadata, auto id
+    const val CHUNKS = "chunks"                                            // organisationDocuments/{id}/chunks/{n}: file bytes
     const val VERIFICATION_AUDIT_LOGS = "verificationAuditLogs"            // append-only
 
     // ── Events ──────────────────────────────────────────────────────────

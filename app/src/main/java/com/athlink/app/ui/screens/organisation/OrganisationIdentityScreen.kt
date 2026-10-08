@@ -115,14 +115,14 @@ fun OrganisationIdentityStep(
         WhyWeNeedThis("Reviewers contact the organisation through these official channels to confirm it exists and that you represent it. They're kept private and are not shown to players.")
     }
 
-    FormSection("Logo", "Optional. JPG, PNG or WebP under 2 MB.") {
+    FormSection("Logo", "Optional. Any JPG, PNG or WebP: it is resized automatically.") {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(64.dp).clip(CircleShape).background(Brush.linearGradient(listOf(GradientStart, GradientEnd))),
                 contentAlignment = Alignment.Center
             ) {
                 if (d.logoUrl.isNotBlank()) {
-                    AsyncImage(model = d.logoUrl, contentDescription = "Organisation logo", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    OrgLogoImage(d.logoUrl, "Organisation logo", Modifier.fillMaxSize())
                 } else {
                     Text(d.displayName.take(2).uppercase().ifBlank { "OR" }, color = Color.White, fontWeight = FontWeight.Bold)
                 }

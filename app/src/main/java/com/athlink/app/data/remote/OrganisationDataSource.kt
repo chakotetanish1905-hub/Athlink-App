@@ -1,7 +1,7 @@
 package com.athlink.app.data.remote
 
-import android.net.Uri
 import com.athlink.app.data.model.AuditAction
+import com.athlink.app.data.model.DocumentChunks
 import com.athlink.app.data.model.DocumentReviewStatus
 import com.athlink.app.data.model.Organisation
 import com.athlink.app.data.model.OrganisationAffiliation
@@ -20,17 +20,16 @@ import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.WriteBatch
-import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.StorageMetadata
-import kotlinx.coroutines.channels.awaitClose
+import com.google.firebase.firestore.Blob
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * All Firestore / Storage / Auth calls for organisation verification.
+ * All Firestore / Auth calls for organisation verification. Documents are stored privately in
+ * Firestore (chunked), so everything works on the free Spark plan without Cloud Storage.
  *
  * Every write sends only owner-editable fields, plus the two owner status transitions that
  * firestore.rules allow (UNVERIFIED -> CONTACT_VERIFIED, editable -> UNDER_REVIEW). Approval,
@@ -39,8 +38,8 @@ import javax.inject.Singleton
 @Singleton
 class OrganisationDataSource @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val storage: FirebaseStorage,
-    private val auth: FirebaseAuth
+    private val auth: FirebaseAuth,
+    private val fileReader: FileBytesReader
 ) {
 
     private fun orgRef(id: String) = firestore.collection(FirestorePaths.ORGANISATIONS).document(id)
@@ -224,55 +223,56 @@ class OrganisationDataSource @Inject constructor(
     val isEmailVerified: Boolean get() = auth.currentUser?.isEmailVerified == true
     val accountEmail: String get() = auth.currentUser?.email.orEmpty()
 
-    // ── Documents (private Storage + metadata) ──────────────────────────
+    // ── Documents (private, stored inside Firestore: works on the Spark plan) ──
 
     /**
-     * Uploads [file] to `organisation_documents/{orgId}/{documentId}/{name}` and, once the upload
-     * succeeds, writes its metadata (always PENDING_MANUAL_REVIEW) and an audit entry.
+     * Stores [file] privately WITHOUT Cloud Storage: metadata in `organisationDocuments/{id}`
+     * and the bytes in `organisationDocuments/{id}/chunks/{n}` (see [DocumentChunks]).
+     * Photos over the limit are compressed first. Metadata, chunks and the audit entry are
+     * written in ONE batch, so a document is either fully stored or not at all.
      * Emits progress 0..1 and finally the stored [OrganisationDocument].
      */
     fun uploadDocument(
         organisationId: String,
         type: OrganisationDocumentType,
         file: PickedFile
-    ): Flow<UploadEvent> = callbackFlow {
+    ): Flow<UploadEvent> = flow {
+        emit(UploadEvent.Progress(0.05f))
+        val prepared = fileReader.prepareDocument(file.uri, file.mimeType)
+        if (prepared.bytes.size > DocumentChunks.MAX_STORED_BYTES) {
+            throw InvalidUploadException(
+                if (prepared.mimeType == "application/pdf") "PDF must be under ${DocumentChunks.MAX_STORED_BYTES / (1024 * 1024)} MB. Try compressing it or uploading a photo instead."
+                else "This file is too large even after compression."
+            )
+        }
+        emit(UploadEvent.Progress(0.35f))
+        val parts = DocumentChunks.split(prepared.bytes)
+
         val metaRef = documents.document()
         val documentId = metaRef.id
-        val safeName = OrganisationDocs.safeFileName(file.fileName, file.mimeType)
-        val path = StoragePaths.organisationDocument(organisationId, documentId, safeName)
-        val storageRef = storage.reference.child(path)
-        val metadata = StorageMetadata.Builder().setContentType(file.mimeType).build()
-
-        val task = storageRef.putFile(Uri.parse(file.uri), metadata)
-        task.addOnProgressListener { snap ->
-            val total = snap.totalByteCount.takeIf { it > 0 } ?: file.sizeBytes
-            if (total > 0) trySend(UploadEvent.Progress(snap.bytesTransferred.toFloat() / total))
-        }.addOnFailureListener { e ->
-            close(e)
-        }.addOnSuccessListener {
-            val doc = OrganisationDocument(
-                documentId = documentId,
-                organisationId = organisationId,
-                ownerUid = organisationId,
-                documentType = type.name,
-                storagePath = path,
-                fileName = file.fileName,
-                mimeType = file.mimeType.orEmpty(),
-                sizeBytes = file.sizeBytes,
-                verificationStatus = DocumentReviewStatus.PENDING_MANUAL_REVIEW.name
-            )
-            val batch = firestore.batch()
-            batch.set(metaRef, OrganisationDocs.documentCreateFields(doc))
-            appendAudit(batch, organisationId, AuditAction.DOCUMENT_UPLOADED, "", "", notes = "${type.name}:$documentId")
-            batch.commit()
-                .addOnSuccessListener { trySend(UploadEvent.Done(doc)); close() }
-                .addOnFailureListener { e ->
-                    // Don't leave an orphaned file without metadata.
-                    storageRef.delete()
-                    close(e)
-                }
+        val doc = OrganisationDocument(
+            documentId = documentId,
+            organisationId = organisationId,
+            ownerUid = organisationId,
+            documentType = type.name,
+            storagePath = DocumentChunks.storagePath(documentId),
+            storageBackend = DocumentChunks.STORAGE_BACKEND,
+            chunkCount = parts.size,
+            fileName = OrganisationDocs.displayFileName(file.fileName, prepared.mimeType),
+            mimeType = prepared.mimeType,
+            sizeBytes = prepared.bytes.size.toLong(),
+            verificationStatus = DocumentReviewStatus.PENDING_MANUAL_REVIEW.name
+        )
+        val batch = firestore.batch()
+        batch.set(metaRef, OrganisationDocs.documentCreateFields(doc))
+        parts.forEachIndexed { i, part ->
+            batch.set(metaRef.collection(FirestorePaths.CHUNKS).document(i.toString()), mapOf("index" to i, "data" to Blob.fromBytes(part)))
         }
-        awaitClose { if (task.isInProgress) task.cancel() }
+        appendAudit(batch, organisationId, AuditAction.DOCUMENT_UPLOADED, "", "", notes = "${type.name}:$documentId")
+        emit(UploadEvent.Progress(0.6f))
+        batch.commit().await()
+        emit(UploadEvent.Progress(1f))
+        emit(UploadEvent.Done(doc))
     }
 
     /** Owner-editable descriptive metadata (number, issuer, dates). */
@@ -292,31 +292,28 @@ class OrganisationDataSource @Inject constructor(
         Result.success(Unit)
     } catch (e: Exception) { Result.failure(e) }
 
-    /** Removes a document before submission: the file first, then its metadata. */
+    /** Removes a document before submission: its chunks and metadata in one batch. */
     suspend fun removeDocument(document: OrganisationDocument): Result<Unit> = try {
-        if (document.storagePath.isNotBlank()) {
-            runCatching { storage.reference.child(document.storagePath).delete().await() }
-                .onFailure { e ->
-                    // A file that is already gone is fine; anything else (e.g. permission) is not.
-                    if ((e as? com.google.firebase.storage.StorageException)?.errorCode !=
-                        com.google.firebase.storage.StorageException.ERROR_OBJECT_NOT_FOUND) throw e
-                }
-        }
-        documents.document(document.documentId).delete().await()
+        val metaRef = documents.document(document.documentId)
+        val batch = firestore.batch()
+        val count = document.chunkCount.coerceIn(0, DocumentChunks.MAX_CHUNKS)
+        for (i in 0 until count) batch.delete(metaRef.collection(FirestorePaths.CHUNKS).document(i.toString()))
+        batch.delete(metaRef)
+        batch.commit().await()
         Result.success(Unit)
     } catch (e: Exception) { Result.failure(e) }
 
-    // ── Logo (public) ───────────────────────────────────────────────────
+    // ── Logo (public, small data URI on the organisation document) ──────
 
     suspend fun uploadLogo(organisationId: String, file: PickedFile): Result<String> = try {
-        val ref = storage.reference.child(StoragePaths.organisationLogo(organisationId))
-        val metadata = StorageMetadata.Builder().setContentType(file.mimeType).build()
-        ref.putFile(Uri.parse(file.uri), metadata).await()
-        val url = ref.downloadUrl.await().toString()
-        orgRef(organisationId).update(mapOf("logoUrl" to url, "updatedAt" to FieldValue.serverTimestamp())).await()
-        Result.success(url)
+        val dataUri = fileReader.prepareLogoDataUri(file.uri)
+        orgRef(organisationId).update(mapOf("logoUrl" to dataUri, "updatedAt" to FieldValue.serverTimestamp())).await()
+        Result.success(dataUri)
     } catch (e: Exception) { Result.failure(e) }
 }
+
+/** Upload rejected before anything was written (file too large, unreadable...). */
+class InvalidUploadException(message: String) : IllegalArgumentException(message)
 
 sealed interface UploadEvent {
     data class Progress(val fraction: Float) : UploadEvent
@@ -387,6 +384,8 @@ object OrganisationDocs {
         "ownerUid" to doc.ownerUid,
         "documentType" to doc.documentType,
         "storagePath" to doc.storagePath,
+        "storageBackend" to doc.storageBackend,
+        "chunkCount" to doc.chunkCount,
         "fileName" to doc.fileName,
         "mimeType" to doc.mimeType,
         "sizeBytes" to doc.sizeBytes,
@@ -400,6 +399,13 @@ object OrganisationDocs {
         "reviewedBy" to null,
         "reviewNotes" to null
     )
+
+    /** Original name, with the extension corrected if a photo was converted to JPEG. */
+    fun displayFileName(original: String, storedMime: String): String {
+        val base = original.substringBeforeLast('.').ifBlank { "document" }.take(80)
+        return if (storedMime == "image/jpeg" && !original.lowercase().let { it.endsWith(".jpg") || it.endsWith(".jpeg") }) "$base.jpg"
+        else original.take(100)
+    }
 
     /** Storage object name: letters, digits, dot, dash, underscore; keeps a sensible extension. */
     fun safeFileName(original: String, mimeType: String?): String {

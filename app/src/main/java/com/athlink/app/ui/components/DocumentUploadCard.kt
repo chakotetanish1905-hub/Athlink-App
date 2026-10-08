@@ -148,7 +148,7 @@ fun DocumentUploadCard(
                     Spacer(Modifier.width(6.dp))
                     Text(if (satisfied) "Add another file" else "Upload file")
                 }
-                Text("PDF, JPG or PNG · max ${OrganisationValidators.MAX_DOCUMENT_BYTES / (1024 * 1024)} MB", fontSize = 11.sp,
+                Text("PDF up to ${OrganisationValidators.MAX_DOCUMENT_BYTES / (1024 * 1024)} MB, or a JPG/PNG photo (compressed automatically)", fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

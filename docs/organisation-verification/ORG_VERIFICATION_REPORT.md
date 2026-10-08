@@ -97,15 +97,23 @@ Player, coach, chat, booking and auth screens were **not** changed.
 
 **Indexes:** one composite index, `verificationAuditLogs (organisationId ASC, performedAt DESC)`, used by the admin `show` command. Every app query is single-field (`ownerUid ==`, `organisationId ==`) and needs no index.
 
-## 5. Firebase Storage structure
+## 5. Document storage (works on the free Spark plan)
+
+Cloud Storage needs the Blaze plan, so verification files are kept **inside Firestore**, privately:
 
 ```
-organisation_documents/{organisationId}/{documentId}/{fileName}   PRIVATE: owner + admin read; PDF/JPG/PNG ≤ 5 MB;
-                                                                   create/delete only while verification is editable;
-                                                                   no overwrite; never given a public download URL
-organisation_logos/{organisationId}/logo                           public to signed-in users; image ≤ 2 MB; owner write
-coaches/{uid}/public/profile.jpg, coachVerification/{uid}/**       coach paths from the coach plan
+organisationDocuments/{documentId}                 metadata: type, fileName, mimeType, sizeBytes, chunkCount,
+                                                   storageBackend: "FIRESTORE",
+                                                   storagePath: "firestore:organisationDocuments/{id}/chunks"
+organisationDocuments/{documentId}/chunks/{i}      { index: i, data: <bytes ≤ 700 KB> }, i = 0..chunkCount-1
+organisations/{id}.logoUrl                         small logo as data:image/jpeg;base64 (320 px, ≤ 150 000 chars)
 ```
+
+- PDFs up to **3 MB**. JPG/PNG photos of any size up to 25 MB are shrunk on the phone (max 2200 px, JPEG) to fit 3 MB.
+- Metadata, every chunk and the DOCUMENT_UPLOADED audit entry are written in **one batch**: an upload is all-or-nothing.
+- Chunks: readable only by the owner and admins; created only together with their own metadata (index < chunkCount, ≤ 700 KB, ≤ 5 chunks); never updated; deleted only while verification is editable.
+- Reviewers download files with `node admin.js show <orgId> --download <dir>` (chunks are joined in order and checked for completeness).
+- `storage.rules` stays in the repo for a future move to Cloud Storage (Blaze). The rules and admin tool accept both backends.
 
 ## 6. Security rule changes
 
@@ -190,9 +198,9 @@ Brief test mapping:
 
 ## 12. Manual Firebase console steps
 
-1. **Deploy rules + indexes:** `firebase deploy --only firestore:rules,firestore:indexes,storage` (or paste `firestore.rules` / `storage.rules` into the console).
-2. **Storage needs the Blaze plan** (it has a no-cost tier). On Spark, document uploads fail with "Uploads are unavailable…" and organisations can't complete verification.
-3. **Allow cross-service rules:** the first Storage-rules deploy asks to grant Storage access to Firestore. Accept it.
+1. **Deploy rules + indexes:** paste `firestore.rules` into Firestore → Rules and publish (or `firebase deploy --only firestore:rules,firestore:indexes`).
+2. **No Blaze plan needed.** Documents and logos are stored in Firestore (section 5). Skip `storage.rules` unless you later upgrade and switch to Cloud Storage.
+3. Spark free quota (1 GiB stored, 20k writes/day) covers roughly 300+ organisations' document sets.
 4. **Authentication → Templates:** check the email-verification template / sender. Email/Password provider must stay enabled.
 5. **Make yourself admin:** download a service-account key (Project settings → Service accounts), then:
    `cd tools/admin && npm install && export GOOGLE_APPLICATION_CREDENTIALS=key.json ATHLINK_ADMIN=you@x.com && node admin.js set-admin you@x.com`
@@ -210,7 +218,7 @@ Brief test mapping:
 
 ## 14. Testing organisation signup from a fresh account
 
-1. Deploy rules (step 12.1) and make sure the project is on Blaze (12.2). Build and run from Android Studio.
+1. Deploy rules (step 12.1). Build and run from Android Studio. The Spark (free) plan is enough.
 2. **Signup:** Create Account → pick **Organisation** → organisation name, a real email you can open, a password → **Register Organisation**. You land on **Organisation verification, step 1**.
 3. **Firestore check:** `users/{uid}` has `role: ORGANISATION, organisationId: uid`. `organisations/{uid}` has `verificationStatus: UNVERIFIED`.
 4. **Step 1:** fill legal/display name, choose **Sports Academy**, primary sport, a description of 30+ characters, official email/phone. Tap **Next** (the draft is saved). Close (✕) and reopen the app: you resume at step 2 with everything filled in.

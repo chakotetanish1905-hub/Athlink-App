@@ -51,8 +51,8 @@ JVM unit tests live in `app/src/test` (JUnit 4) and cover the pure-Kotlin coach 
 
 ## Firebase setup
 
-`app/google-services.json` must correspond to a Firebase project for package `com.athlink.app` with Email/Password Auth, Firestore, and Storage enabled (Storage requires the Blaze plan).
+`app/google-services.json` must correspond to a Firebase project for package `com.athlink.app` with Email/Password Auth and Firestore enabled. The project runs on the free Spark plan: Cloud Storage is not used. Organisation verification files are stored privately as ≤700 KB chunks in `organisationDocuments/{id}/chunks` (`DocumentChunks.kt`, `FileBytesReader.kt`) and logos as small data URIs.
 
-Security rules are versioned in the repo: `firestore.rules`, `storage.rules`, `firestore.indexes.json` (deploy with `firebase deploy --only firestore:rules,firestore:indexes,storage`). The old development rule (`allow read, write: if request.auth != null`) must not be used any more. Rules tests: `cd tests/rules && npm install && npm run emulators:test` (needs Java 21). Admin tasks (grant admin claim, approve/reject/suspend organisations, expire-due, migrate-legacy): `tools/admin/admin.js help`.
+Security rules are versioned in the repo: `firestore.rules`, `storage.rules`, `firestore.indexes.json` (deploy with `firebase deploy --only firestore:rules,firestore:indexes`; `storage.rules` is kept only for a future Blaze move). The old development rule (`allow read, write: if request.auth != null`) must not be used any more. Rules tests: `cd tests/rules && npm install && npm run emulators:test` (needs Java 21). Admin tasks (grant admin claim, approve/reject/suspend organisations, expire-due, migrate-legacy): `tools/admin/admin.js help`.
 
 CI (`.github/workflows/ci.yml`) runs `testDebugUnitTest`, `assembleDebug` (with a dummy google-services.json) and the rules tests on every push.

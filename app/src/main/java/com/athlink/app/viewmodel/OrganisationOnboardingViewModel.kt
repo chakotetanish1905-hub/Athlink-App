@@ -337,6 +337,7 @@ class OrganisationOnboardingViewModel @Inject constructor(
         }
         is EmailNotVerifiedException -> "Verify your account email first (see the box above)."
         is InvalidFileException -> e.message ?: fallback
+        is com.athlink.app.data.remote.InvalidUploadException -> e.message ?: fallback
         else -> ErrorMessages.from(e, fallback, "onboarding")
     }
 }

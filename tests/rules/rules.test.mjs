@@ -9,7 +9,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, Timestamp,
-  collection, getDocs, query, where,
+  collection, getDocs, query, where, Bytes,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getBytes, deleteObject } from 'firebase/storage';
 
@@ -219,12 +219,15 @@ test('documents: owner creates PENDING metadata only; others cannot read it; rev
   const id = 'doc1';
   const meta = {
     documentId: id, organisationId: ORG, ownerUid: ORG, documentType: 'ADDRESS_PROOF',
-    storagePath: `organisation_documents/${ORG}/${id}/bill.pdf`, fileName: 'bill.pdf', mimeType: 'application/pdf', sizeBytes: 2048,
+    storagePath: `firestore:organisationDocuments/${id}/chunks`, storageBackend: 'FIRESTORE', chunkCount: 1,
+    fileName: 'bill.pdf', mimeType: 'application/pdf', sizeBytes: 2048,
     documentNumber: null, issuingAuthority: null, issuedDate: null, expiryDate: null, verificationStatus: 'PENDING_MANUAL_REVIEW',
     uploadedAt: serverTimestamp(), reviewedAt: null, reviewedBy: null, reviewNotes: null,
   };
   await assertFails(setDoc(doc(f, 'organisationDocuments', id), { ...meta, verificationStatus: 'VERIFIED' }));
-  await assertFails(setDoc(doc(f, 'organisationDocuments', id), { ...meta, storagePath: `organisation_documents/${OTHER}/${id}/x.pdf` }));
+  await assertFails(setDoc(doc(f, 'organisationDocuments', id), { ...meta, storagePath: `firestore:organisationDocuments/other/chunks` }));
+  await assertFails(setDoc(doc(f, 'organisationDocuments', id), { ...meta, chunkCount: 9 }));
+  await assertFails(setDoc(doc(f, 'organisationDocuments', id), { ...meta, sizeBytes: 4 * 1024 * 1024 }));
   await assertSucceeds(setDoc(doc(f, 'organisationDocuments', id), meta));
   await assertSucceeds(getDocs(query(collection(f, 'organisationDocuments'), where('ownerUid', '==', ORG))));
   await assertFails(getDoc(doc(db(OTHER), 'organisationDocuments', id)));
@@ -243,6 +246,60 @@ test('audit logs: users cannot read, forge admin actions, edit or delete', async
     newStatus: 'VERIFIED', performedBy: ORG, performedAt: serverTimestamp(), reason: '', notes: '', source: 'APP' }));
   // Admins can read the trail.
   await assertSucceeds(getDoc(doc(db('admin1', { admin: true }), 'verificationAuditLogs', 'l1')));
+});
+
+// ── Spark-plan document storage: file bytes in organisationDocuments/{id}/chunks ──
+function chunkedUpload(f, id, owner, { parts = 2, partSize = 1000, chunkCount = parts } = {}) {
+  const b = writeBatch(f);
+  b.set(doc(f, 'organisationDocuments', id), {
+    documentId: id, organisationId: owner, ownerUid: owner, documentType: 'AUTHORIZATION_LETTER',
+    storagePath: `firestore:organisationDocuments/${id}/chunks`, storageBackend: 'FIRESTORE', chunkCount,
+    fileName: 'letter.pdf', mimeType: 'application/pdf', sizeBytes: parts * partSize,
+    documentNumber: null, issuingAuthority: null, issuedDate: null, expiryDate: null, verificationStatus: 'PENDING_MANUAL_REVIEW',
+    uploadedAt: serverTimestamp(), reviewedAt: null, reviewedBy: null, reviewNotes: null,
+  });
+  for (let i = 0; i < parts; i++) {
+    b.set(doc(f, 'organisationDocuments', id, 'chunks', String(i)), { index: i, data: Bytes.fromUint8Array(new Uint8Array(partSize).fill(i + 1)) });
+  }
+  return b.commit();
+}
+
+test('TEST 18b: chunked documents are stored atomically and readable only by the owner / admin', async () => {
+  await seedOrg(ORG);
+  await assertSucceeds(chunkedUpload(db(ORG), 'docA', ORG));
+  await assertSucceeds(getDocs(collection(db(ORG), 'organisationDocuments', 'docA', 'chunks')));
+  await assertFails(getDocs(collection(db(OTHER), 'organisationDocuments', 'docA', 'chunks')));
+  await assertFails(getDoc(doc(db(PLAYER), 'organisationDocuments', 'docA', 'chunks', '0')));
+  await assertSucceeds(getDocs(collection(db('admin1', { admin: true }), 'organisationDocuments', 'docA', 'chunks')));
+  // Chunks can't be rewritten after upload.
+  await assertFails(setDoc(doc(db(ORG), 'organisationDocuments', 'docA', 'chunks', '0'), { index: 0, data: Bytes.fromUint8Array(new Uint8Array(5)) }));
+});
+
+test('chunk limits: no extra chunks, no oversize chunks, no chunks for someone else', async () => {
+  await seedOrg(ORG);
+  await seedOrg(OTHER);
+  await assertFails(chunkedUpload(db(ORG), 'd1', ORG, { parts: 3, chunkCount: 2 }));        // more chunks than declared
+  await assertFails(chunkedUpload(db(ORG), 'd2', ORG, { parts: 1, partSize: 800 * 1024 })); // chunk > 700 KB
+  await assertFails(chunkedUpload(db(OTHER), 'd3', ORG));                                    // owner mismatch
+});
+
+test('chunked documents can be removed while editable, not while under review', async () => {
+  await seedOrg(ORG);
+  await assertSucceeds(chunkedUpload(db(ORG), 'docB', ORG));
+  const del = (f) => { const b = writeBatch(f); b.delete(doc(f, 'organisationDocuments', 'docB', 'chunks', '0'));
+    b.delete(doc(f, 'organisationDocuments', 'docB', 'chunks', '1')); b.delete(doc(f, 'organisationDocuments', 'docB')); return b.commit(); };
+  await seed(async (f) => updateDoc(doc(f, 'organisations', ORG), { verificationStatus: 'UNDER_REVIEW' }));
+  await assertFails(del(db(ORG)));
+  await assertFails(chunkedUpload(db(ORG), 'docC', ORG));
+  await seed(async (f) => updateDoc(doc(f, 'organisations', ORG), { verificationStatus: 'REJECTED' }));
+  await assertSucceeds(del(db(ORG)));
+});
+
+test('logo data URI is size-limited on the public profile', async () => {
+  await seedOrg(ORG, { verificationStatus: 'UNDER_REVIEW' });
+  const small = 'data:image/jpeg;base64,' + 'A'.repeat(40_000);
+  await assertSucceeds(updateDoc(doc(db(ORG), 'organisations', ORG), { logoUrl: small, updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(ORG), 'organisations', ORG), { logoUrl: 'data:' + 'A'.repeat(200_000), updatedAt: serverTimestamp() }));
 });
 
 // ── TEST 5 / 15 / 16 / 17: event publishing ────────────────────────────────

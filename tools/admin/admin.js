@@ -14,6 +14,8 @@ import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { getStorage } from 'firebase-admin/storage';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join, basename } from 'node:path';
 import { Status, assertTransition, levelFor, auditActionFor, computeExpiry, isDue } from './policy.js';
 
 const HELP = `
@@ -21,7 +23,8 @@ Athlink admin tool: organisation verification
 
   set-admin <email> [--remove]            Grant / remove the admin custom claim (user must log in again)
   list [--status UNDER_REVIEW]            List organisations (default: UNDER_REVIEW)
-  show <orgId> [--links]                  Everything a reviewer needs (+ 15-min private links to documents)
+  show <orgId> [--download <dir>]         Everything a reviewer needs; --download saves the documents to <dir>
+                                          (--links: 15-min links, only for files kept in Cloud Storage)
   review-doc <documentId> <VERIFIED|REJECTED|EXPIRED> [--notes "..."]
   approve <orgId> [--official] [--expires YYYY-MM-DD] [--notes "..."]
                                           UNDER_REVIEW -> VERIFIED (or OFFICIAL_GOVERNMENT for government bodies)
@@ -60,6 +63,16 @@ function need(value, message) { if (!value) { console.error(message); process.ex
 async function documentsOf(orgId) {
   const snap = await db.collection('organisationDocuments').where('ownerUid', '==', orgId).get();
   return snap.docs.map((d) => d.data());
+}
+
+/** Reassembles a document stored as organisationDocuments/{id}/chunks/{index} (Spark plan, no Cloud Storage). */
+async function readChunkedFile(d) {
+  const snap = await db.collection('organisationDocuments').doc(d.documentId).collection('chunks').get();
+  const parts = snap.docs.map((c) => c.data()).sort((a, b) => a.index - b.index);
+  if (parts.length !== d.chunkCount || parts.some((p, i) => p.index !== i)) {
+    throw new Error(`Document ${d.documentId} is incomplete (${parts.length}/${d.chunkCount} chunks)`);
+  }
+  return Buffer.concat(parts.map((p) => Buffer.from(p.data)));
 }
 
 /** Applies a status decision + audit log atomically. */
@@ -124,7 +137,7 @@ const commands = {
   },
 
   async show() {
-    const id = need(positional[0], 'Usage: show <orgId> [--links]');
+    const id = need(positional[0], 'Usage: show <orgId> [--download <dir>] [--links]');
     const [org, ver, rep, aff] = await Promise.all([
       orgRef(id).get(), verRef(id).get(),
       db.collection('organisationRepresentatives').doc(id).get(),
@@ -140,7 +153,13 @@ const commands = {
     console.log('\n== Documents');
     for (const d of docs) {
       let link = '';
-      if (flags.links) {
+      if (flags.download && d.storageBackend === 'FIRESTORE') {
+        const dir = typeof flags.download === 'string' ? flags.download : `./${id}-documents`;
+        mkdirSync(dir, { recursive: true });
+        const out = join(dir, `${d.documentId}-${basename(d.fileName || 'document')}`);
+        writeFileSync(out, await readChunkedFile(d));
+        link = `\n    saved ${out}`;
+      } else if (flags.links && d.storageBackend !== 'FIRESTORE') {
         const [url] = await getStorage().bucket().file(d.storagePath).getSignedUrl({ action: 'read', expires: Date.now() + 15 * 60 * 1000 });
         link = `\n    ${url}`;
       }

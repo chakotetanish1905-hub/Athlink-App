@@ -72,7 +72,7 @@ fun OrgProfileScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 24.dp, start = 16.dp, end = 16.dp)) {
                     Box(Modifier.size(96.dp).clip(CircleShape).background(Brush.linearGradient(listOf(GradientStart, GradientEnd))), contentAlignment = Alignment.Center) {
                         if (!org?.logoUrl.isNullOrBlank()) {
-                            AsyncImage(model = org?.logoUrl, contentDescription = "Logo of $name", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                            OrgLogoImage(org?.logoUrl.orEmpty(), "Logo of $name", Modifier.fillMaxSize())
                         } else {
                             Text(name.take(2).uppercase().ifBlank { "OR" }, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp)
                         }

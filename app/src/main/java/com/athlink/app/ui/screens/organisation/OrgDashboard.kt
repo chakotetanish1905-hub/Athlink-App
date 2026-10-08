@@ -31,6 +31,7 @@ import com.athlink.app.ui.components.OrganisationBadgeChip
 import com.athlink.app.ui.components.accentColor
 import com.athlink.app.ui.components.icon
 import com.athlink.app.ui.components.orgNavItems
+import com.athlink.app.ui.components.OrgLogoImage
 import com.athlink.app.ui.theme.*
 import com.athlink.app.viewmodel.OrganisationEventsViewModel
 import com.athlink.app.viewmodel.OrganisationViewModel
@@ -85,7 +86,7 @@ fun OrgDashboardScreen(
                         }
                         Box(modifier = Modifier.size(42.dp).clip(CircleShape).background(Brush.linearGradient(listOf(GradientStart, GradientEnd))), contentAlignment = Alignment.Center) {
                             if (!org?.logoUrl.isNullOrBlank()) {
-                                AsyncImage(model = org?.logoUrl, contentDescription = "Logo", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                OrgLogoImage(org?.logoUrl.orEmpty(), "Logo", Modifier.fillMaxSize())
                             } else {
                                 Text(name.take(2).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }

@@ -13,7 +13,7 @@ rules_version = '2';
 //   editable   -> UNDER_REVIEW (submit)          (needs email_verified)
 //
 // Mirrors: OrganisationVerificationPolicy.kt / CoachVerificationPolicy.kt / tools/admin/policy.js.
-// Tests:   tests/rules/firestore.rules.test.js
+// Tests:   tests/rules/rules.test.mjs
 // ─────────────────────────────────────────────────────────────────────────────
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -103,7 +103,9 @@ service cloud.firestore {
         && d.sports is list && d.sports.size() <= 20
         && d.description is string && d.description.size() <= 600
         && d.website is string && d.website.size() <= 200
-        && d.publicAddress is string && d.publicAddress.size() <= 150;
+        && d.publicAddress is string && d.publicAddress.size() <= 150
+        // Logo is a small data: URI (or URL); keep the public document light.
+        && d.get('logoUrl', '') is string && d.get('logoUrl', '').size() <= 150000;
     }
 
     match /organisations/{orgId} {
@@ -243,9 +245,14 @@ service cloud.firestore {
         && incoming().ownerUid == request.auth.uid
         && incoming().organisationId == request.auth.uid
         && incoming().documentType in documentTypes()
-        && incoming().storagePath.matches('organisation_documents/' + request.auth.uid + '/' + documentId + '/[^/]+')
+        // Bytes live in chunks/{n} below (Spark plan, no Cloud Storage), or in Storage if ever enabled.
+        && ((incoming().get('storageBackend', '') == 'FIRESTORE'
+              && incoming().storagePath == 'firestore:organisationDocuments/' + documentId + '/chunks'
+              && incoming().chunkCount is int && incoming().chunkCount >= 1 && incoming().chunkCount <= 5)
+            || (incoming().get('storageBackend', '') == ''
+              && incoming().storagePath.matches('organisation_documents/' + request.auth.uid + '/' + documentId + '/[^/]+')))
         && incoming().mimeType in ['application/pdf', 'image/jpeg', 'image/png']
-        && incoming().sizeBytes is int && incoming().sizeBytes <= 5 * 1024 * 1024
+        && incoming().sizeBytes is int && incoming().sizeBytes > 0 && incoming().sizeBytes <= 3 * 1024 * 1024
         && incoming().verificationStatus == 'PENDING_MANUAL_REVIEW'
         && incoming().reviewedAt == null
         && incoming().reviewedBy == null
@@ -259,6 +266,28 @@ service cloud.firestore {
       allow delete: if signedIn()
         && existing().ownerUid == request.auth.uid
         && orgEditable(request.auth.uid);
+
+      // File bytes (Firestore backend). Same visibility as the metadata: owner + admin only.
+      // Written in the same batch as the metadata (getAfter), never updated, deleted with it.
+      match /chunks/{chunkId} {
+        function parentPath() { return path('organisationDocuments', documentId); }
+        allow read: if signedIn() && get(parentPath()).data.ownerUid == request.auth.uid;
+        allow create: if signedIn()
+          && existsAfter(parentPath())
+          && getAfter(parentPath()).data.ownerUid == request.auth.uid
+          && incoming().keys().hasOnly(['index', 'data'])
+          && incoming().index is int
+          && incoming().index >= 0
+          && incoming().index < getAfter(parentPath()).data.chunkCount
+          && chunkId == string(incoming().index)
+          && incoming().data is bytes
+          && incoming().data.size() <= 700 * 1024
+          && orgEditable(request.auth.uid);
+        allow update: if false;
+        allow delete: if signedIn()
+          && get(parentPath()).data.ownerUid == request.auth.uid
+          && orgEditable(request.auth.uid);
+      }
     }
 
     // Append-only audit trail. Admin decisions are written by the Admin SDK. The app may only

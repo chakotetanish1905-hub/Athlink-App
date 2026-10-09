@@ -14,9 +14,11 @@ import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { getStorage } from 'firebase-admin/storage';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { join, basename, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Status, assertTransition, levelFor, auditActionFor, computeExpiry, isDue } from './policy.js';
+import { checkSeed, directoryId, listingFields, verifiedFields, LISTING_SOURCE, ID_PREFIX } from './directory.js';
 
 const HELP = `
 Athlink admin tool: organisation verification
@@ -33,6 +35,11 @@ Athlink admin tool: organisation verification
   reactivate <orgId> [--official] [--notes "..."]   SUSPENDED -> VERIFIED / OFFICIAL_GOVERNMENT
   expire-due [--dry-run]                  Mark verified organisations whose verification or documents expired
   migrate-legacy [--dry-run]              Create UNVERIFIED organisations/{uid} for older ORGANISATION accounts
+  seed-directory [--file <json>] [--dry-run]
+                                          Import pre-verified academies (no Athlink account) as organisations/dir-*.
+                                          Default file: seed/vadodara-surat-academies.json. Safe to re-run: existing
+                                          listings get refreshed details/ratings but keep their verification status.
+  unseed-directory [--dry-run]            Delete every organisations/dir-* listing (and nothing else)
 `;
 
 // ── Args ────────────────────────────────────────────────────────────────────
@@ -258,6 +265,61 @@ const commands = {
       console.log(`created organisations/${uid} (UNVERIFIED) for ${u.data().email}`);
     }
     console.log(`${created} legacy organisation account(s) ${flags['dry-run'] ? 'found' : 'migrated'}.`);
+  },
+  async 'seed-directory'() {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const file = flags.file || join(here, 'seed', 'vadodara-surat-academies.json');
+    const seed = JSON.parse(readFileSync(file, 'utf8'));
+    const entries = checkSeed(seed);
+    const ratingSource = seed.source ? `Google rating snapshot via ${seed.source}` : 'Google rating snapshot';
+    const now = new Date();
+    let created = 0, updated = 0, skipped = 0;
+    let batch = db.batch(), ops = 0;
+    for (const e of entries) {
+      const id = directoryId(e);
+      const ref = orgRef(id);
+      const snap = await ref.get();
+      if (snap.exists && snap.data().listingSource !== LISTING_SOURCE) {
+        console.warn(`skip ${id}: exists and is not a directory listing`); skipped++; continue;
+      }
+      const fields = listingFields(e, ratingSource);
+      if (snap.exists) {
+        updated++;
+        if (!flags['dry-run']) { batch.update(ref, { ...fields, updatedAt: FieldValue.serverTimestamp() }); ops++; }
+      } else {
+        created++;
+        if (flags['dry-run']) { console.log(`would create ${id}\t${e.name}\t${fields.sports.join('/')}\t${fields.publicAddress}`); continue; }
+        batch.set(ref, {
+          ...fields, logoUrl: '', ...verifiedFields(now),
+          createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
+        });
+        const log = db.collection('verificationAuditLogs').doc();
+        batch.set(log, {
+          logId: log.id, organisationId: id, action: 'APPROVED', previousStatus: null, newStatus: Status.VERIFIED,
+          performedBy: ADMIN, performedAt: FieldValue.serverTimestamp(),
+          reason: 'Pre-verified directory listing', notes: seed.title ?? basename(file), source: 'ADMIN',
+        });
+        ops += 2;
+      }
+      if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; }
+    }
+    if (ops > 0) await batch.commit();
+    const verb = flags['dry-run'] ? 'would be' : 'were';
+    console.log(`${entries.length} listings in ${basename(file)}: ${created} ${verb} created, ${updated} ${verb} refreshed, ${skipped} skipped.`);
+  },
+
+  async 'unseed-directory'() {
+    const snap = await db.collection('organisations').where('listingSource', '==', LISTING_SOURCE).get();
+    const docs = snap.docs.filter((d) => d.id.startsWith(ID_PREFIX));
+    if (flags['dry-run']) { docs.forEach((d) => console.log(`would delete ${d.id}\t${d.data().displayName}`)); }
+    else {
+      for (let i = 0; i < docs.length; i += 400) {
+        const batch = db.batch();
+        docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+    }
+    console.log(`${docs.length} directory listing(s) ${flags['dry-run'] ? 'would be' : ''} deleted.`.replace('  ', ' '));
   },
 };
 

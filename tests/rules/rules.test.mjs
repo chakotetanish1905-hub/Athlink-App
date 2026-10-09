@@ -424,6 +424,45 @@ test('documents cannot be uploaded or deleted while under review', async () => {
 });
 
 // ── Other existing collections keep working ────────────────────────────────
+// ── Pre-verified directory listings (admin tool `seed-directory`) ──────────
+const DIR = 'dir-vadodara-arjun-badminton-academy';
+const directoryListing = (overrides = {}) => orgProfile(DIR, {
+  ownerUid: '', displayName: 'Arjun Badminton Academy', legalName: 'Arjun Badminton Academy', sports: ['Badminton'],
+  city: 'Vadodara', locality: 'Tandalja', publicAddress: 'Tandalja, Vadodara', state: 'Gujarat', district: 'Vadodara',
+  listingSource: 'DIRECTORY_IMPORT', venueCategory: 'INDOOR', googleRating: 5.0, googleReviewCount: 34, ratingSource: 'snapshot',
+  ...verified, ...overrides,
+});
+
+test('DIRECTORY: signed-in users can read a listing; signed-out users cannot', async () => {
+  await seed(async (f) => setDoc(doc(f, 'organisations', DIR), directoryListing()));
+  await assertSucceeds(getDoc(doc(db(PLAYER), 'organisations', DIR)));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'organisations', DIR)));
+});
+
+test('DIRECTORY: nobody can edit, claim, delete or publish as a listing', async () => {
+  await seed(async (f) => setDoc(doc(f, 'organisations', DIR), directoryListing()));
+  await seedOrg(ORG, verified);
+  for (const f of [db(ORG), db(PLAYER)]) {
+    await assertFails(updateDoc(doc(f, 'organisations', DIR), { googleRating: 1, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(f, 'organisations', DIR), { ownerUid: ORG, updatedAt: serverTimestamp() }));
+    await assertFails(deleteDoc(doc(f, 'organisations', DIR)));
+  }
+  await assertFails(setDoc(doc(db(ORG), 'events', 'e-dir'), event('e-dir', DIR, { organisationName: 'Arjun Badminton Academy', publishedByUid: ORG })));
+});
+
+test('DIRECTORY: an organisation account cannot mark itself a listing or set a rating', async () => {
+  const f = db(ORG);
+  const b = writeBatch(f);
+  b.set(doc(f, 'users', ORG), { uid: ORG, name: 'ASA', email: 'a@x.org', role: 'ORGANISATION', organisationId: ORG });
+  b.set(doc(f, 'organisations', ORG), orgProfile(ORG, { listingSource: 'DIRECTORY_IMPORT', createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+  await assertFails(b.commit());
+
+  await seedOrg(ORG);
+  await assertFails(updateDoc(doc(f, 'organisations', ORG), { googleRating: 5, googleReviewCount: 999, updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(f, 'organisations', ORG), { listingSource: 'DIRECTORY_IMPORT', updatedAt: serverTimestamp() }));
+  await assertSucceeds(updateDoc(doc(f, 'organisations', ORG), { legalName: 'Andheri Sports Academy Pvt', updatedAt: serverTimestamp() }));
+});
+
 test('sessions: player books, coach updates status only', async () => {
   const s = { id: 's1', coachId: 'coach1', playerId: PLAYER, status: 'PENDING', price: 800 };
   await assertSucceeds(setDoc(doc(db(PLAYER), 'sessions', 's1'), s));

@@ -192,6 +192,10 @@ service cloud.firestore {
         && d.get('logoUrl', '') is string && d.get('logoUrl', '').size() <= 150000;
     }
 
+    // Set only by the admin tool's `seed-directory` (pre-verified academies, ids "dir-*", no owner).
+    // An organisation account can never mark itself a directory listing or set a rating.
+    function directoryOnlyKeys() { return ['listingSource', 'googleRating', 'googleReviewCount', 'ratingSource']; }
+
     match /organisations/{orgId} {
       // Public profile: any signed-in user (players see who runs an event).
       allow read: if signedIn();
@@ -206,11 +210,13 @@ service cloud.firestore {
         && incoming().verificationExpiresAt == null
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time
+        && !incoming().keys().hasAny(directoryOnlyKeys())
         && validOrgPublic(incoming());
 
       allow update: if isSelf(orgId)
         && incoming().updatedAt == request.time
         && unchanged(['organisationId', 'ownerUid', 'createdAt', 'verifiedAt', 'verificationExpiresAt'])
+        && unchanged(directoryOnlyKeys())
         && validOrgPublic(incoming())
         && (
           // (a) Profile edit, no status change. Identity / location fields are locked unless

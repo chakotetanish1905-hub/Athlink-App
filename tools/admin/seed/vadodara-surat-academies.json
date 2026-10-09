@@ -1,0 +1,871 @@
+{
+  "title": "Athlink Coach & Academy Landscape Scan: Vadodara and Surat",
+  "source": "discover.lyfskills.com sports-class directory (aggregated Google Business Profile listings)",
+  "note": "Ratings / review counts are a snapshot taken at the time of the scan. null = not rated.",
+  "organisations": [
+    {
+      "city": "Vadodara",
+      "section": "Badminton",
+      "venueCategory": "INDOOR",
+      "name": "JN Sports Academy for Badminton",
+      "locality": "Gorwa",
+      "googleRating": 4.6,
+      "googleReviewCount": 24
+    },
+    {
+      "city": "Vadodara",
+      "section": "Badminton",
+      "venueCategory": "INDOOR",
+      "name": "Arjun Badminton Academy",
+      "locality": "Tandalja",
+      "googleRating": 5.0,
+      "googleReviewCount": 34
+    },
+    {
+      "city": "Vadodara",
+      "section": "Badminton",
+      "venueCategory": "INDOOR",
+      "name": "Blackk&One Sports Foundation",
+      "locality": "Manjalpur",
+      "googleRating": 5.0,
+      "googleReviewCount": 5
+    },
+    {
+      "city": "Vadodara",
+      "section": "Badminton",
+      "venueCategory": "INDOOR",
+      "name": "The Sports Junction",
+      "locality": "Alkapuri",
+      "googleRating": 5.0,
+      "googleReviewCount": 41
+    },
+    {
+      "city": "Vadodara",
+      "section": "Badminton",
+      "venueCategory": "INDOOR",
+      "name": "Sayaji Vihar Club Badminton Coaching Centre",
+      "locality": "Nava Bazaar",
+      "googleRating": 4.1,
+      "googleReviewCount": 199
+    },
+    {
+      "city": "Vadodara",
+      "section": "Badminton",
+      "venueCategory": "INDOOR",
+      "name": "Ace Badminton Stars",
+      "locality": "Wadi",
+      "googleRating": null,
+      "googleReviewCount": null
+    },
+    {
+      "city": "Vadodara",
+      "section": "Badminton",
+      "venueCategory": "INDOOR",
+      "name": "Nurture Sports Academy (Tennis & Badminton)",
+      "locality": "Gorwa",
+      "googleRating": 4.6,
+      "googleReviewCount": 39
+    },
+    {
+      "city": "Vadodara",
+      "section": "Badminton",
+      "venueCategory": "INDOOR",
+      "name": "GBGC Badminton Court",
+      "locality": "Manjalpur",
+      "googleRating": 4.6,
+      "googleReviewCount": 56
+    },
+    {
+      "city": "Vadodara",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "City Table Tennis Club & Sports Centre",
+      "locality": "Tandalja",
+      "googleRating": 5.0,
+      "googleReviewCount": 143
+    },
+    {
+      "city": "Vadodara",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Urban Turf Vadodara (Sports Ocean Club)",
+      "locality": "Bhayli",
+      "googleRating": 5.0,
+      "googleReviewCount": 29
+    },
+    {
+      "city": "Vadodara",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "DVAGH",
+      "locality": "Bhayli",
+      "googleRating": 5.0,
+      "googleReviewCount": 24
+    },
+    {
+      "city": "Vadodara",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "T Square Table Tennis Academy",
+      "locality": "Saiyed Vasna",
+      "googleRating": 5.0,
+      "googleReviewCount": 7
+    },
+    {
+      "city": "Vadodara",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "HORUS Academy, Chapad Branch",
+      "locality": "Tandalja",
+      "googleRating": 5.0,
+      "googleReviewCount": 3
+    },
+    {
+      "city": "Vadodara",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Horus Academy",
+      "locality": "Manjalpur",
+      "googleRating": 5.0,
+      "googleReviewCount": 2
+    },
+    {
+      "city": "Vadodara",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Shree Table Tennis & Fitness Academy",
+      "locality": "Sayaji Park",
+      "googleRating": 4.9,
+      "googleReviewCount": 12
+    },
+    {
+      "city": "Vadodara",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "L&T KC Club",
+      "locality": "Sayaji Park",
+      "googleRating": 4.8,
+      "googleReviewCount": 184
+    },
+    {
+      "city": "Vadodara",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Starlet Table Tennis Academy",
+      "locality": "Gotri",
+      "googleRating": 4.6,
+      "googleReviewCount": 82
+    },
+    {
+      "city": "Vadodara",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "MSU Table Tennis Court",
+      "locality": "Alkapuri",
+      "googleRating": 4.6,
+      "googleReviewCount": 42
+    },
+    {
+      "city": "Vadodara",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Sama Indoor Sports Complex",
+      "locality": "Alkapuri",
+      "googleRating": 4.4,
+      "googleReviewCount": 2839
+    },
+    {
+      "city": "Vadodara",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Deesha Dynamic Table Tennis Academy",
+      "locality": "Gotri",
+      "googleRating": 4.4,
+      "googleReviewCount": 29
+    },
+    {
+      "city": "Vadodara",
+      "section": "Basketball / Pickleball",
+      "venueCategory": "INDOOR",
+      "name": "BallersZone Academy",
+      "locality": "Gotri",
+      "googleRating": 5.0,
+      "googleReviewCount": 4
+    },
+    {
+      "city": "Vadodara",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "MDK Cricket Academy",
+      "locality": "Gorwa",
+      "googleRating": 4.9,
+      "googleReviewCount": 44
+    },
+    {
+      "city": "Vadodara",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "DHSCA Cricket Coaching Academy",
+      "locality": "Manjalpur",
+      "googleRating": 4.8,
+      "googleReviewCount": 123
+    },
+    {
+      "city": "Vadodara",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "National Sports Academy Cricket",
+      "locality": "Alkapuri",
+      "googleRating": 4.8,
+      "googleReviewCount": 84
+    },
+    {
+      "city": "Vadodara",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "SkillXL Cricket Academy",
+      "locality": "Gotri",
+      "googleRating": 4.8,
+      "googleReviewCount": 13
+    },
+    {
+      "city": "Vadodara",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "Unique Indoor Cricket Academy",
+      "locality": "Gotri",
+      "googleRating": 4.7,
+      "googleReviewCount": 7
+    },
+    {
+      "city": "Vadodara",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "Finess Cricket Academy",
+      "locality": "Alkapuri",
+      "googleRating": 4.5,
+      "googleReviewCount": 18
+    },
+    {
+      "city": "Vadodara",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "Veer Cricket Academy",
+      "locality": "Sayaji Park",
+      "googleRating": 4.4,
+      "googleReviewCount": 14
+    },
+    {
+      "city": "Vadodara",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "Vadodara Cricket Academy",
+      "locality": "Bhayli",
+      "googleRating": 4.3,
+      "googleReviewCount": 614
+    },
+    {
+      "city": "Vadodara",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "KRUGARA Cricket Academy",
+      "locality": "Nava Bazaar",
+      "googleRating": 4.3,
+      "googleReviewCount": 50
+    },
+    {
+      "city": "Vadodara",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "Kiran More Cricket Academy",
+      "locality": "Gotri",
+      "googleRating": 4.2,
+      "googleReviewCount": 235
+    },
+    {
+      "city": "Vadodara",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "City Football Academy",
+      "locality": "Bhayli",
+      "googleRating": 5.0,
+      "googleReviewCount": 3
+    },
+    {
+      "city": "Vadodara",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Baroda Football Academy, VMC Manjalpur Centre",
+      "locality": "Manjalpur",
+      "googleRating": 4.9,
+      "googleReviewCount": 27
+    },
+    {
+      "city": "Vadodara",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "PSFC Football Academy",
+      "locality": "Gorwa",
+      "googleRating": 4.9,
+      "googleReviewCount": 176
+    },
+    {
+      "city": "Vadodara",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Kickjack Football Club",
+      "locality": "Manjalpur",
+      "googleRating": 4.8,
+      "googleReviewCount": 42
+    },
+    {
+      "city": "Vadodara",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Baroda Football Academy (Office)",
+      "locality": "Alkapuri",
+      "googleRating": 4.5,
+      "googleReviewCount": 70
+    },
+    {
+      "city": "Vadodara",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "BFA Sports Complex, Manjalpur",
+      "locality": "Manjalpur",
+      "googleRating": 4.5,
+      "googleReviewCount": 108
+    },
+    {
+      "city": "Vadodara",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Navrachana Sports Academy Football Field",
+      "locality": "Alkapuri",
+      "googleRating": 4.2,
+      "googleReviewCount": 48
+    },
+    {
+      "city": "Vadodara",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Dodgers Football Club",
+      "locality": "Alkapuri",
+      "googleRating": 4.2,
+      "googleReviewCount": 60
+    },
+    {
+      "city": "Vadodara",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Akota Sports Complex",
+      "locality": "Alkapuri",
+      "googleRating": 4.1,
+      "googleReviewCount": 1464
+    },
+    {
+      "city": "Vadodara",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "BFA Sports Complex, Ankodia",
+      "locality": "Gorwa",
+      "googleRating": 4.1,
+      "googleReviewCount": 29
+    },
+    {
+      "city": "Vadodara",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Rangers Football Academy",
+      "locality": "Bhayli",
+      "googleRating": 3.9,
+      "googleReviewCount": 10
+    },
+    {
+      "city": "Vadodara",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Dwivedi Brother Football Academia",
+      "locality": "Bhayli",
+      "googleRating": null,
+      "googleReviewCount": null
+    },
+    {
+      "city": "Vadodara",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Baroda Football Academy, American School",
+      "locality": "Sayaji Park",
+      "googleRating": null,
+      "googleReviewCount": null
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "IKTA Tennis Academy",
+      "locality": "Tandalja",
+      "googleRating": 5.0,
+      "googleReviewCount": 1
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "Vadodara Tennis Academy",
+      "locality": "Manjalpur",
+      "googleRating": 4.9,
+      "googleReviewCount": 107
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "Diamond Sports Studio",
+      "locality": "Gotri",
+      "googleRating": 4.8,
+      "googleReviewCount": 383
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "ESHANYA Sports Academy (Lawn Tennis & Skating)",
+      "locality": "Gotri",
+      "googleRating": 4.8,
+      "googleReviewCount": 52
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "adVantaJe Tennis & Fitness",
+      "locality": "Alkapuri",
+      "googleRating": 4.8,
+      "googleReviewCount": 29
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "Athletes Arena (Pickleball/Turf/Padel)",
+      "locality": "Gotri",
+      "googleRating": 4.7,
+      "googleReviewCount": 40
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "United Sports Arena",
+      "locality": "Manjalpur",
+      "googleRating": 4.6,
+      "googleReviewCount": 237
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "Ajay Tennis",
+      "locality": "Tandalja",
+      "googleRating": 4.6,
+      "googleReviewCount": 53
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "Bal Bhavan Tennis Academy",
+      "locality": "Alkapuri",
+      "googleRating": 4.5,
+      "googleReviewCount": 495
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "BTPA Tennis Academy",
+      "locality": "Alkapuri",
+      "googleRating": 4.5,
+      "googleReviewCount": 80
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "Baroda Tennis Center",
+      "locality": "Manjalpur",
+      "googleRating": 4.5,
+      "googleReviewCount": 21
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "Diamond Sports",
+      "locality": "Nava Bazaar",
+      "googleRating": 4.4,
+      "googleReviewCount": 873
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "Baroda Sports Arena (BSA)",
+      "locality": "Gotri",
+      "googleRating": 4.4,
+      "googleReviewCount": 269
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "M.S. Tennis Academy",
+      "locality": "Tandalja",
+      "googleRating": 4.4,
+      "googleReviewCount": 9
+    },
+    {
+      "city": "Vadodara",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "Advantage Tennis & Pickleball Academy",
+      "locality": "Alkapuri",
+      "googleRating": 4.4,
+      "googleReviewCount": 19
+    },
+    {
+      "city": "Surat",
+      "section": "Badminton",
+      "venueCategory": "INDOOR",
+      "name": "Maneet Pahuja Badminton Academy",
+      "locality": "Victoria Palms",
+      "googleRating": 5.0,
+      "googleReviewCount": 26
+    },
+    {
+      "city": "Surat",
+      "section": "Badminton",
+      "venueCategory": "INDOOR",
+      "name": "Yash Badminton & Pickleball Academy",
+      "locality": "Victoria Palms",
+      "googleRating": 4.9,
+      "googleReviewCount": 16
+    },
+    {
+      "city": "Surat",
+      "section": "Badminton",
+      "venueCategory": "INDOOR",
+      "name": "Padukone Sports Management, Adajan",
+      "locality": "Green Avenue Apts.",
+      "googleRating": null,
+      "googleReviewCount": null
+    },
+    {
+      "city": "Surat",
+      "section": "Badminton",
+      "venueCategory": "INDOOR",
+      "name": "Padukone Sports Management, Katargam",
+      "locality": "Katargam Daravaja",
+      "googleRating": 5.0,
+      "googleReviewCount": 1
+    },
+    {
+      "city": "Surat",
+      "section": "Badminton",
+      "venueCategory": "INDOOR",
+      "name": "Propel Racquet Academy (Tennis & Badminton)",
+      "locality": "Green Avenue Apts.",
+      "googleRating": 4.9,
+      "googleReviewCount": 73
+    },
+    {
+      "city": "Surat",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Revolution Beyond Education",
+      "locality": "Sarthana Jakatnaka",
+      "googleRating": 5.0,
+      "googleReviewCount": 210
+    },
+    {
+      "city": "Surat",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Spin Table Tennis Academy",
+      "locality": "Miranagar Society",
+      "googleRating": 4.9,
+      "googleReviewCount": 50
+    },
+    {
+      "city": "Surat",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Euro Star TT Academy, Adajan",
+      "locality": "Saiyedwada",
+      "googleRating": 4.8,
+      "googleReviewCount": 48
+    },
+    {
+      "city": "Surat",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Euro Star TT Academy, Vesu",
+      "locality": "Mansarovar Bungalows",
+      "googleRating": 4.8,
+      "googleReviewCount": 18
+    },
+    {
+      "city": "Surat",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Najmi Sir Academy",
+      "locality": "Green Avenue Apts.",
+      "googleRating": 4.8,
+      "googleReviewCount": 4
+    },
+    {
+      "city": "Surat",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Khaimat Ur Riyazat",
+      "locality": "Salabatpura",
+      "googleRating": 4.7,
+      "googleReviewCount": 2352
+    },
+    {
+      "city": "Surat",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Hauxing Table Tennis Academy",
+      "locality": "Mansarovar Bungalows",
+      "googleRating": 4.6,
+      "googleReviewCount": 25
+    },
+    {
+      "city": "Surat",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Khelghar Sports Arena",
+      "locality": "Mansarovar Bungalows",
+      "googleRating": 4.5,
+      "googleReviewCount": 501
+    },
+    {
+      "city": "Surat",
+      "section": "Table Tennis",
+      "venueCategory": "INDOOR",
+      "name": "Phoenix Table Tennis Academy",
+      "locality": "Green Avenue Apts.",
+      "googleRating": null,
+      "googleReviewCount": null
+    },
+    {
+      "city": "Surat",
+      "section": "Basketball / Pickleball",
+      "venueCategory": "INDOOR",
+      "name": "Yash Pickleball & Basketball Academy",
+      "locality": "Victoria Palms",
+      "googleRating": 3.8,
+      "googleReviewCount": 8
+    },
+    {
+      "city": "Surat",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "SK Cricket Academy",
+      "locality": "Dindoli",
+      "googleRating": 4.8,
+      "googleReviewCount": 185
+    },
+    {
+      "city": "Surat",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "Sai Cricket Academy",
+      "locality": "Mansarovar Bungalows",
+      "googleRating": 4.7,
+      "googleReviewCount": 68
+    },
+    {
+      "city": "Surat",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "Friends Cricket Academy",
+      "locality": "Green Avenue Apts.",
+      "googleRating": 4.8,
+      "googleReviewCount": 68
+    },
+    {
+      "city": "Surat",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "BSS Cricket Academy",
+      "locality": "Mansarovar Bungalows",
+      "googleRating": 4.5,
+      "googleReviewCount": 187
+    },
+    {
+      "city": "Surat",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "Divine Sports Academy",
+      "locality": "Mansarovar Bungalows",
+      "googleRating": 4.4,
+      "googleReviewCount": 60
+    },
+    {
+      "city": "Surat",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "UCA Cricket Academy",
+      "locality": "Dindoli",
+      "googleRating": 4.4,
+      "googleReviewCount": 23
+    },
+    {
+      "city": "Surat",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "KAPS Cricket Academy",
+      "locality": "Miranagar Society",
+      "googleRating": 4.3,
+      "googleReviewCount": 121
+    },
+    {
+      "city": "Surat",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "Happy Cricket Academy, Adajan",
+      "locality": "Saiyedwada",
+      "googleRating": 4.0,
+      "googleReviewCount": 95
+    },
+    {
+      "city": "Surat",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "United Sports Cricket Academy",
+      "locality": "Mansarovar Bungalows",
+      "googleRating": 5.0,
+      "googleReviewCount": 6
+    },
+    {
+      "city": "Surat",
+      "section": "Cricket",
+      "venueCategory": "OUTDOOR",
+      "name": "Vedant Cricket Academy (VCA)",
+      "locality": "Dindoli",
+      "googleRating": 5.0,
+      "googleReviewCount": 4
+    },
+    {
+      "city": "Surat",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Bombay Bombers Football Academy",
+      "locality": "Hirabag",
+      "googleRating": 5.0,
+      "googleReviewCount": 7
+    },
+    {
+      "city": "Surat",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Bombay Bombers Football Academy, Chhaprabhatha",
+      "locality": "Chhaprabhatha",
+      "googleRating": 5.0,
+      "googleReviewCount": 5
+    },
+    {
+      "city": "Surat",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Balpreet Singh Professional Football Academy",
+      "locality": "Mansarovar Bungalows",
+      "googleRating": 4.9,
+      "googleReviewCount": 153
+    },
+    {
+      "city": "Surat",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Youth Soccer Academy",
+      "locality": "Mansarovar Bungalows",
+      "googleRating": 4.9,
+      "googleReviewCount": 12
+    },
+    {
+      "city": "Surat",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Dew Drops Football Academy",
+      "locality": "Mansarovar Bungalows",
+      "googleRating": 5.0,
+      "googleReviewCount": 3
+    },
+    {
+      "city": "Surat",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "USI FC Surat Adajan",
+      "locality": "Green Avenue Apts.",
+      "googleRating": 4.6,
+      "googleReviewCount": 48
+    },
+    {
+      "city": "Surat",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "USI Sports Academy",
+      "locality": "Mansarovar Bungalows",
+      "googleRating": 5.0,
+      "googleReviewCount": 3
+    },
+    {
+      "city": "Surat",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Surat Football Academy",
+      "locality": "Mini Bazar",
+      "googleRating": 4.2,
+      "googleReviewCount": 5
+    },
+    {
+      "city": "Surat",
+      "section": "Football",
+      "venueCategory": "OUTDOOR",
+      "name": "Football School of Surat",
+      "locality": "Green Avenue Apts.",
+      "googleRating": 4.2,
+      "googleReviewCount": 34
+    },
+    {
+      "city": "Surat",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "Ravindra's Lawn Tennis Academy",
+      "locality": "Green Avenue Apts.",
+      "googleRating": 4.9,
+      "googleReviewCount": 59
+    },
+    {
+      "city": "Surat",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "JD Tennis Academy",
+      "locality": "Green Avenue Apts.",
+      "googleRating": 4.9,
+      "googleReviewCount": 8
+    },
+    {
+      "city": "Surat",
+      "section": "Tennis",
+      "venueCategory": "OUTDOOR",
+      "name": "Maitri Tennis Academy",
+      "locality": "Nandavan Society",
+      "googleRating": 4.5,
+      "googleReviewCount": 39
+    }
+  ]
+}

@@ -49,6 +49,16 @@ data class Organisation(
 
     val yearEstablished: Int? = null,
 
+    // ── Directory listings (admin tool `seed-directory` only; rules lock these for owners) ──
+    /** "" for organisations that signed up in the app; [DIRECTORY_LISTING_SOURCE] for imported academies. */
+    val listingSource: String = "",
+    /** "INDOOR" / "OUTDOOR" ("" when unknown). */
+    val venueCategory: String = "",
+    /** Google rating snapshot taken when the listing was imported; null = not rated. */
+    val googleRating: Double? = null,
+    val googleReviewCount: Int? = null,
+    val ratingSource: String = "",
+
     // ── Admin-only status ────────────────────────────────────────────────
     val verificationStatus: String = OrganisationVerificationStatus.UNVERIFIED.name,
     val verificationLevel: String = OrganisationVerificationLevel.LEVEL_0_UNVERIFIED.name,
@@ -63,6 +73,16 @@ val Organisation.type: OrganisationType? get() = OrganisationType.fromStored(org
 val Organisation.storedStatus: OrganisationVerificationStatus get() = OrganisationVerificationStatus.fromStored(verificationStatus)
 val Organisation.level: OrganisationVerificationLevel get() = OrganisationVerificationLevel.fromStored(verificationLevel)
 val Organisation.primarySport: String get() = sports.firstOrNull().orEmpty()
+
+/** Stored in [Organisation.listingSource] by `tools/admin/directory.js`. */
+const val DIRECTORY_LISTING_SOURCE = "DIRECTORY_IMPORT"
+
+/**
+ * A pre-verified academy imported by an admin (id starts with "dir-", no owner account).
+ * Nobody can sign in as it, edit it or publish events for it.
+ */
+val Organisation.isDirectoryListing: Boolean
+    get() = listingSource == DIRECTORY_LISTING_SOURCE && ownerUid.isEmpty()
 
 /** Status after applying expiry: a verified organisation past [Organisation.verificationExpiresAt] is EXPIRED. */
 fun Organisation.effectiveStatus(now: Date = Date()): OrganisationVerificationStatus =

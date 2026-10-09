@@ -26,7 +26,7 @@ Build and run from Android Studio (Hedgehog+), or via Gradle wrapper from the pr
 ./gradlew test
 ```
 
-JVM unit tests live in `app/src/test` (JUnit 4) and cover the pure-Kotlin coach model, validation, verification policy and profile-completion logic. There are no instrumented (`androidTest`) tests yet.
+JVM unit tests live in `app/src/test` (JUnit 4) and cover the pure-Kotlin coach / organisation / player models, validation, verification policies and profile-completion logic. There are no instrumented (`androidTest`) tests yet.
 
 ## Architecture
 
@@ -48,6 +48,8 @@ JVM unit tests live in `app/src/test` (JUnit 4) and cover the pure-Kotlin coach 
 - New Firestore collection: add the model in `data/model/`, add CRUD methods to `FirestoreSource.kt`, wrap them in a repository under `data/repository/` (consider the dummy-data fallback pattern above), and inject the repository into the relevant ViewModel.
 
 **Organisation verification (ROLE ≠ VERIFICATION):** an ORGANISATION account gets trust only from `organisations/{uid}.verificationStatus/verificationLevel`, which only the admin tool (`tools/admin`, Admin SDK) can raise. Rules for every transition live in `OrganisationVerificationPolicy.kt`, `firestore.rules` and `tools/admin/policy.js`; change all three together. Per-type fields/documents come from `OrganisationRequirements.kt`. The org nav graph starts at `org_gate`, which routes by status. Organisation screens use real Firestore data only (no dummy fallback). Full write-up: `docs/organisation-verification/ORG_VERIFICATION_REPORT.md`.
+
+**Player signup ≠ player profile:** player signup collects only name/email/password + Terms/Privacy consent (`PlayerSignupForm`, `FirebaseAuthSource.signUpPlayer`) and writes `users/{uid}` with `profileStatus = INCOMPLETE`. The player graph starts at `player_gate`, which routes to the 7-step onboarding until `PlayerProfilePolicy.isComplete` (status COMPLETE **and** the stored data still validates). Private player data (DOB, phone, gender, consents, notification preferences) stays on owner-only `users/{uid}`; the discoverable profile is `players/{uid}` (signed-in read). Both are always written in one batch by `PlayerDataSource`; the uid always comes from FirebaseAuth, never the UI. All rules live in `PlayerValidators.kt` / `PlayerProfileForm.kt` and are mirrored in `firestore.rules` (change them together). Sport-specific questions are data in `SportProfiles` (no model change needed to add one). Player profile screens use real data only. Full write-up: `docs/player-onboarding/PLAYER_ONBOARDING_REPORT.md`.
 
 ## Firebase setup
 

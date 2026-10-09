@@ -10,6 +10,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,6 +19,12 @@ data class PlayerSnapshot(val user: User, val player: PlayerProfile?)
 
 /** Thrown when there is no Firebase Auth user; the UID is never taken from the UI. */
 class NotSignedInException : IllegalStateException("Not signed in")
+
+/**
+ * The server didn't confirm a write in time (usually offline). Firestore keeps the write queued and
+ * sends it when the connection returns, so nothing is lost; the UI just stops waiting.
+ */
+class SaveNotConfirmedException : IllegalStateException("Write not confirmed by the server in time")
 
 /**
  * Firestore calls for player profiles. The document id is ALWAYS the Firebase Auth uid of the
@@ -89,10 +96,16 @@ class PlayerDataSource @Inject constructor(
             batch.set(playerRef(uid), playerFields + ("createdAt" to FieldValue.serverTimestamp()))
         }
         batch.update(userRef(uid), userFields)
-        batch.commit().await()
+        // commit() only completes once the server acknowledges it, which never happens offline.
+        val confirmed = withTimeoutOrNull(SAVE_TIMEOUT_MS) { batch.commit().await(); true } ?: false
+        if (!confirmed) throw SaveNotConfirmedException()
         Result.success(Unit)
     } catch (e: Exception) {
         Result.failure(e)
+    }
+
+    companion object {
+        const val SAVE_TIMEOUT_MS = 15_000L
     }
 
     /** Shrinks the picked photo to a small JPEG data URI. Nothing is written until the profile is saved. */

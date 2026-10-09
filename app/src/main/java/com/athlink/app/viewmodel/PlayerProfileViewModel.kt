@@ -11,6 +11,7 @@ import com.athlink.app.data.model.PlayerProfileForm
 import com.athlink.app.data.model.PlayerProfileStatus
 import com.athlink.app.data.model.User
 import com.athlink.app.data.remote.PlayerSnapshot
+import com.athlink.app.data.remote.SaveNotConfirmedException
 import com.athlink.app.data.repository.InvalidFileException
 import com.athlink.app.data.repository.InvalidProfileException
 import com.athlink.app.data.repository.PlayerRepository
@@ -226,9 +227,10 @@ class PlayerProfileViewModel @Inject constructor(
                     if (e is InvalidProfileException) {
                         _state.update { it.copy(isSaving = false, errors = e.errors, message = "Please fix the highlighted fields.") }
                     } else {
-                        _state.update {
-                            it.copy(isSaving = false, message = ErrorMessages.from(e, "We couldn't save your profile. Please try again.", "savePlayer"))
-                        }
+                        val msg = if (e is SaveNotConfirmedException) {
+                            "Please check your internet connection and try again. Your answers are kept."
+                        } else ErrorMessages.from(e, "We couldn't save your profile. Please try again.", "savePlayer")
+                        _state.update { it.copy(isSaving = false, message = msg) }
                     }
                 }
         }

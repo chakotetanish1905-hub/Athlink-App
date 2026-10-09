@@ -53,7 +53,7 @@ class PlayerOnboardingSectionsUiTest {
     private fun chooseMainSport(sport: String) {
         rule.onNodeWithText("Main sport *").performScrollTo().performClick()
         rule.waitForIdle()
-        rule.onAllNodesWithText(sport).let { it[it.fetchSemanticsNodes().size - 1] }.performClick()
+        rule.onAllNodesWithText(sport).let { it[it.fetchSemanticsNodes().size - 1] }.performScrollTo().performClick()
         rule.waitForIdle()
     }
 

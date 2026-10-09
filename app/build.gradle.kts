@@ -42,6 +42,11 @@ android {
     buildFeatures {
         compose = true
     }
+
+    // Robolectric runs the Compose UI tests on the JVM (no emulator needed).
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
@@ -82,4 +87,9 @@ dependencies {
 
     // Unit tests (pure Kotlin model / validation / policy logic)
     testImplementation(libs.junit)
+    // Compose UI tests for the player onboarding screens, run on the JVM with Robolectric
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.test.manifest)
 }

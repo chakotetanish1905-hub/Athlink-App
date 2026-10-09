@@ -44,7 +44,7 @@ jobs:
         run: |
           [ -f gradle-output.txt ] || exit 0
           # Kotlin compiler errors ("e: file://...") and failed tests, trimmed to fit one annotation.
-          summary=$( (grep -E '^e: |FAILED|Unresolved|> Task .* FAILED|What went wrong' -A2 gradle-output.txt | grep -v '^--$' | sed 's#file:///home/runner/work/[^/]*/[^/]*/##') | cut -c1-300 | head -120)
+          summary=$( (grep -E '^e: |FAILED|Unresolved|> Task .* FAILED|What went wrong' -A3 gradle-output.txt | grep -v '^--$' | sed 's#file:///home/runner/work/[^/]*/[^/]*/##') | cut -c1-300 | head -120)
           msg=$(printf '%s' "$summary" | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
           echo "::error title=Gradle build output::${msg}"
       - name: Upload test reports

@@ -130,9 +130,11 @@ class PlayerOnboardingScreenUiTest {
     fun backKeepsAnswers() {
         val vm = launch(FakePlayerStore(user, step1Done))
         chooseMainSport("Hockey")
+        assertEquals("after choosing", "Hockey", vm.state.value.form.primarySport)
         press("Next")
+        assertEquals("after Next", PlayerOnboardingStep.GAME, vm.state.value.step)
         press("Back")
-        assertEquals(PlayerOnboardingStep.SPORT, vm.state.value.step)
+        assertEquals("after Back", PlayerOnboardingStep.SPORT, vm.state.value.step)
         assertEquals("Hockey", vm.state.value.form.primarySport)
     }
 }

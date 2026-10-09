@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -124,7 +125,8 @@ fun ChoiceCard(title: String, description: String, selected: Boolean, onClick: (
 }
 
 /**
- * Sport picker: exactly one PRIMARY sport (required) plus optional secondary sports.
+ * Sport picker: exactly one PRIMARY sport (required, from a dropdown) plus optional secondary
+ * sports (chips). Two different controls so the main sport can't be confused with "other sports".
  * Uses the same sport list as coaches ([Sports.ALL]) so the two sides can be matched later.
  */
 @Composable
@@ -137,16 +139,16 @@ fun SportSelector(
     secondaryError: String? = null
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(fieldLabel("Main sport", required = true), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-        SingleChoiceChips(
+        DropdownField(
+            label = fieldLabel("Main sport", required = true),
             options = Sports.ALL,
             selected = primarySport.ifBlank { null },
-            label = { it },
-            onSelect = { sport -> if (sport != null) onPrimarySelected(sport) }
+            optionLabel = { it },
+            onSelect = onPrimarySelected,
+            leadingIcon = Icons.Default.SportsSoccer,
+            errorMessage = primaryError
         )
-        FieldError(primaryError)
 
-        Spacer(Modifier.height(6.dp))
         Text(
             fieldLabel("Other sports you play", required = false) + " · up to ${PlayerValidators.MAX_SECONDARY_SPORTS}",
             fontWeight = FontWeight.SemiBold, fontSize = 14.sp

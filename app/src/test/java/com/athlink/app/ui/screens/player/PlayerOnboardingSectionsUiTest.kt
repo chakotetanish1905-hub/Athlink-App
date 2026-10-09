@@ -49,33 +49,41 @@ class PlayerOnboardingSectionsUiTest {
         }
     }
 
+    /** Opens the main-sport dropdown and picks [sport]. */
+    private fun chooseMainSport(sport: String) {
+        rule.onNodeWithText("Main sport *").performScrollTo().performClick()
+        rule.waitForIdle()
+        rule.onAllNodesWithText(sport).let { it[it.fetchSemanticsNodes().size - 1] }.performClick()
+        rule.waitForIdle()
+    }
+
     @Test
     fun mainSportCanBeSelectedAndChanged() {
         show { SportSection(it) }
-        rule.onNodeWithText("Cricket").performScrollTo().performClick()
-        rule.waitForIdle()
+        chooseMainSport("Cricket")
         assertEquals("Cricket", form.primarySport)
-        rule.onNodeWithText("Cricket").assertIsSelected()
-
-        // Once a main sport is chosen, "Football" also appears in the "other sports" row; the
-        // first match is the main-sport chip.
-        rule.onAllNodesWithText("Football")[0].performScrollTo().performClick()
-        rule.waitForIdle()
+        chooseMainSport("Football")
         assertEquals("Football", form.primarySport)
-        rule.onAllNodesWithText("Cricket")[0].assertIsNotSelected()
     }
 
     @Test
     fun secondarySportsAppearAfterMainSportAndToggle() {
         form = form.withPrimarySport("Cricket")
         show { SportSection(it) }
-        // Secondary list excludes the main sport, so "Tennis" appears exactly once (secondary row
-        // is shown below the main row; both contain Tennis -> pick the second via the helper).
-        assertEquals("Cricket", form.primarySport)
-        val tennis = rule.onAllNodesWithTextSafe("Tennis")
-        tennis.last().performScrollTo().performClick()
+        rule.onNodeWithText("Choose your main sport first.").assertDoesNotExist()
+        rule.onNodeWithText("Tennis").performScrollTo().performClick()
         rule.waitForIdle()
         assertEquals(listOf("Tennis"), form.secondarySports)
+        rule.onNodeWithText("Tennis").performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals(emptyList<String>(), form.secondarySports)
+    }
+
+    @Test
+    fun noOtherSportsBeforeMainSport() {
+        show { SportSection(it) }
+        rule.onNodeWithText("Choose your main sport first.").assertExists()
+        rule.onNodeWithText("Tennis").assertDoesNotExist()
     }
 
     @Test
@@ -152,7 +160,4 @@ class PlayerOnboardingSectionsUiTest {
         assertTrue(form.termsAccepted)
         assertTrue(form.privacyAccepted)
     }
-
-    private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTextSafe(text: String) =
-        onAllNodes(androidx.compose.ui.test.hasText(text)).fetchSemanticsNodes().indices.map { onAllNodes(androidx.compose.ui.test.hasText(text))[it] }
 }

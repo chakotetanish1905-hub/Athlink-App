@@ -63,6 +63,14 @@ class PlayerOnboardingScreenUiTest {
         rule.waitForIdle()
     }
 
+    /** Opens the main-sport dropdown and picks [sport] (menu items are the last matches). */
+    private fun chooseMainSport(sport: String) {
+        rule.onNodeWithText("Main sport *").performScrollTo().performClick()
+        rule.waitForIdle()
+        rule.onAllNodesWithText(sport).let { it[it.fetchSemanticsNodes().size - 1] }.performClick()
+        rule.waitForIdle()
+    }
+
     /** Bottom-bar buttons are outside the scrolling content, so they are clicked without scrolling. */
     private fun press(text: String) {
         rule.onAllNodesWithText(text)[0].performClick()
@@ -73,16 +81,18 @@ class PlayerOnboardingScreenUiTest {
     fun resumesAtSportStepAndMainSportCanBeSelected() {
         val vm = launch(FakePlayerStore(user, step1Done))
         assertEquals(PlayerOnboardingStep.SPORT, vm.state.value.step)
-        tap("Cricket")
+        chooseMainSport("Cricket")
         assertEquals("Cricket", vm.state.value.form.primarySport)
-        rule.onAllNodesWithText("Cricket")[0].assertIsSelected()
+        // The chosen sport is shown in the field, and it is not offered again as an "other sport".
+        chooseMainSport("Tennis")
+        assertEquals("Tennis", vm.state.value.form.primarySport)
     }
 
     @Test
     fun fullOnboardingFromSportStepCompletesProfile() {
         val store = FakePlayerStore(user, step1Done)
         val vm = launch(store)
-        tap("Cricket")
+        chooseMainSport("Cricket")
         press("Next")
         assertEquals(PlayerOnboardingStep.GAME, vm.state.value.step)
         tap("Bowler")
@@ -119,7 +129,7 @@ class PlayerOnboardingScreenUiTest {
     @Test
     fun backKeepsAnswers() {
         val vm = launch(FakePlayerStore(user, step1Done))
-        tap("Hockey")
+        chooseMainSport("Hockey")
         press("Next")
         press("Back")
         assertEquals(PlayerOnboardingStep.SPORT, vm.state.value.step)

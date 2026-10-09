@@ -14,6 +14,12 @@ class CoachRepository @Inject constructor(
     /** Bookable coaches only (VERIFIED + ACTIVE). Real data only: empty means none yet. */
     suspend fun getCoaches(): Result<List<Coach>> = firestoreSource.getCoaches()
 
+    /**
+     * Debug builds only: also returns registered coaches still waiting for Athlink approval
+     * (shown as "Not verified yet", not bookable). See [SessionPolicy.isPreviewListed].
+     */
+    suspend fun getCoachesWithPreview(): Result<List<Coach>> = firestoreSource.getCoaches(includePreview = true)
+
     suspend fun getCoachById(coachId: String): Result<Coach> = firestoreSource.getCoachById(coachId)
 
     suspend fun searchCoaches(query: String, sport: String?): List<Coach> {

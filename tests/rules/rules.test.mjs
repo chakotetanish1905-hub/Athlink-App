@@ -644,6 +644,19 @@ test('DIRECTORY COACH: nobody can edit an imported coach; coach accounts cannot 
   await assertSucceeds(updateDoc(doc(f, 'coaches', 'coach9'), { bio: 'Level 2 certified' }));
 });
 
+test('AVAILABILITY: a coach manages only their own valid weekly ranges; players can read them', async () => {
+  await seedCoach(); await seedPlayer(PLAYER);
+  const range = { availabilityId: 'a1', dayOfWeek: 'MONDAY', enabled: true, startTime: '17:00', endTime: '19:00', createdAt: 1, updatedAt: 1 };
+  const own = doc(db(COACH), 'coaches', COACH, 'availability', 'a1');
+  await assertSucceeds(setDoc(own, range));
+  await assertSucceeds(getDocs(collection(db(PLAYER), 'coaches', COACH, 'availability')));
+  await assertFails(setDoc(doc(db(PLAYER), 'coaches', COACH, 'availability', 'a2'), range));
+  await assertFails(setDoc(doc(db(COACH), 'coaches', COACH, 'availability', 'a3'), { ...range, dayOfWeek: 'FUNDAY' }));
+  await assertFails(setDoc(doc(db(COACH), 'coaches', COACH, 'availability', 'a3'), { ...range, startTime: '20:00', endTime: '19:00' }));
+  await assertFails(setDoc(doc(db(COACH), 'coaches', COACH, 'availability', 'a3'), { ...range, price: 5 }));
+  await assertSucceeds(deleteDoc(own));
+});
+
 test('chat: only the two participants can read and write', async () => {
   const thread = `${PLAYER}_coach1`;
   await assertSucceeds(setDoc(doc(db(PLAYER), 'chats', thread, 'messages', 'm1'), { id: 'm1', senderId: PLAYER, receiverId: 'coach1', content: 'hi' }));

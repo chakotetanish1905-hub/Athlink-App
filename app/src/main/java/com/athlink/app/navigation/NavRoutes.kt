@@ -27,6 +27,7 @@ object NavRoutes {
     const val COACH_HOME = "coach_home"
     const val COACH_SESSIONS = "coach_sessions"
     const val COACH_PROFILE = "coach_profile"
+    const val COACH_SCHEDULE = "coach_schedule"
 
     // Organisation
     const val ORG_NAV = "org_nav"

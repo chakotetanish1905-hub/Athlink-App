@@ -118,7 +118,7 @@ fun BookSessionScreen(
                 return@Column
             }
             if (!state.bookable) {
-                Notice("This coach isn't taking bookings right now (their profile isn't verified and active).")
+                Notice("This coach is waiting for Athlink approval. You'll be able to book once their profile is verified.")
                 return@Column
             }
             if (state.dates.isEmpty()) {

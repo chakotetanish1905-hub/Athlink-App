@@ -15,6 +15,7 @@ import com.athlink.app.ui.screens.auth.SignupScreen
 import com.athlink.app.ui.screens.auth.SplashScreen
 import com.athlink.app.ui.screens.coach.CoachDashboardScreen
 import com.athlink.app.ui.screens.coach.CoachProfileScreen
+import com.athlink.app.ui.screens.coach.CoachScheduleScreen
 import com.athlink.app.ui.screens.coach.ManageSessionsScreen
 import com.athlink.app.ui.screens.organisation.CreateEventScreen
 import com.athlink.app.ui.screens.organisation.OrgDashboardScreen
@@ -265,6 +266,10 @@ fun AthlinkNavHost() {
                             rootNavController.navigate(NavRoutes.LOGIN) { popUpTo(0) { inclusive = true } }
                         }
                     )
+                }
+
+                composable(NavRoutes.COACH_SCHEDULE) {
+                    CoachScheduleScreen(user = user, onBack = { coachNavController.popBackStack() })
                 }
 
                 composable(NavRoutes.COACH_SESSIONS) {

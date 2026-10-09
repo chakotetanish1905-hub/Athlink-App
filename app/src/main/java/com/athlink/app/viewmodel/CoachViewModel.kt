@@ -21,8 +21,16 @@ data class CoachListState(
 
 @HiltViewModel
 class CoachViewModel @Inject constructor(
-    private val coachRepository: CoachRepository
+    private val coachRepository: CoachRepository,
+    @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context
 ) : ViewModel() {
+
+    /**
+     * Debug builds (run from Android Studio) also list registered coaches still waiting for
+     * Athlink approval, labelled "Not verified yet" and not bookable. Release builds never do.
+     */
+    private val showPreview: Boolean =
+        (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     private val _state = MutableStateFlow(CoachListState())
     val state: StateFlow<CoachListState> = _state.asStateFlow()
@@ -32,7 +40,7 @@ class CoachViewModel @Inject constructor(
     fun loadCoaches() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
-            val result = coachRepository.getCoaches()
+            val result = if (showPreview) coachRepository.getCoachesWithPreview() else coachRepository.getCoaches()
             result.onSuccess { coaches ->
                 _state.value = _state.value.copy(
                     isLoading = false, coaches = coaches, filteredCoaches = coaches

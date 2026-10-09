@@ -34,14 +34,17 @@ fun CoachDashboardScreen(
     user: User,
     navController: NavHostController,
     onLogout: () -> Unit,
-    sessionViewModel: SessionViewModel = hiltViewModel()
+    sessionViewModel: SessionViewModel = hiltViewModel(),
+    scheduleViewModel: com.athlink.app.viewmodel.CoachScheduleViewModel = hiltViewModel()
 ) {
     val sessionState by sessionViewModel.state.collectAsState()
+    val scheduleState by scheduleViewModel.state.collectAsState()
     val navBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStack?.destination?.route
 
     LaunchedEffect(user.uid) {
         sessionViewModel.loadCoachSessions(user.uid)
+        scheduleViewModel.load(user.uid)
     }
 
     val pending   = sessionState.sessions.filter { it.status == SessionStatus.PENDING }
@@ -83,6 +86,15 @@ fun CoachDashboardScreen(
                 }
             }
 
+            // Visibility to players + availability
+            if (!scheduleState.isLoading) {
+                item {
+                    Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                        CoachVisibilityCard(scheduleState, onOpenSchedule = { navController.navigate("coach_schedule") })
+                    }
+                }
+            }
+
             // Earnings Overview Card
             item {
                 Card(
@@ -117,7 +129,7 @@ fun CoachDashboardScreen(
                         Text("Manage Sessions", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
                     OutlinedButton(
-                        onClick = {},
+                        onClick = { navController.navigate("coach_schedule") },
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = RoundedCornerShape(14.dp)
                     ) {

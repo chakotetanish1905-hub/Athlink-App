@@ -488,13 +488,25 @@ service cloud.firestore {
                 && existing().verificationStatus == 'VERIFIED'));
       allow delete: if false;
 
+      // Weekly availability range (AvailabilityRules.kt): players' booking slots come from these.
+      function validAvailability(d) {
+        return d.keys().hasOnly(['availabilityId', 'dayOfWeek', 'enabled', 'startTime', 'endTime', 'createdAt', 'updatedAt'])
+          && d.dayOfWeek in ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
+          && d.enabled is bool
+          && d.startTime is string && d.startTime.matches('^[0-2][0-9]:[0-5][0-9]$')
+          && d.endTime is string && d.endTime.matches('^[0-2][0-9]:[0-5][0-9]$')
+          && d.startTime < d.endTime;
+      }
+
       // qualifications / services / availability: public; references: owner only.
       match /{sub}/{itemId} {
         allow read: if signedIn() && (sub != 'references' || isSelf(uid));
         allow create: if isSelf(uid)
+          && (sub != 'availability' || validAvailability(incoming()))
           && incoming().get('verificationStatus', 'NOT_SUBMITTED') in ['NOT_SUBMITTED', 'PENDING']
           && incoming().get('status', 'NOT_SUBMITTED') in ['NOT_SUBMITTED', 'PENDING'];
         allow update: if isSelf(uid)
+          && (sub != 'availability' || validAvailability(incoming()))
           && (unchanged(['verificationStatus']) || incoming().verificationStatus in ['NOT_SUBMITTED', 'PENDING'])
           && (unchanged(['status']) || incoming().status in ['NOT_SUBMITTED', 'PENDING'])
           && unchanged(['verifiedAt', 'verifiedBy', 'rejectionReason']);

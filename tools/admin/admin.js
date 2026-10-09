@@ -46,6 +46,13 @@ Athlink admin tool: organisation verification
                                           VERIFIED listing, no ID badges) linked to their academies. Run after
                                           seed-directory. Default file: seed/vadodara-surat-coaches.json
   unseed-coaches [--dry-run]              Delete every coaches/dircoach-* profile (and nothing else)
+  coaches [--all]                         Registered coach accounts (not imported ones) with status and availability;
+                                          --all also lists approved / suspended ones (default: waiting for approval)
+  approve-coach <uid|email> [--notes "..."]
+                                          Make a registered coach visible + bookable (profile ACTIVE, VERIFIED).
+                                          Check what you can first (identity, certificates); ID badges stay off
+                                          until their checks are marked verified.
+  suspend-coach <uid|email> --reason "..."  Hide a coach from players (profile SUSPENDED)
   requests [--status PENDING] [--all]     Player session requests to directory academies (no owner account);
                                           --all includes academies that answer in the app
   answer-request <requestId> <ACCEPTED|DECLINED> --note "..."
@@ -130,6 +137,16 @@ async function decide(orgId, to, { reason = '', notes = '', expires = null, chec
     });
     console.log(`${orgId}: ${from} -> ${to} (${level})`);
   });
+}
+
+/** A registered coach by uid or account email (imported dircoach-* profiles are refused). */
+async function resolveCoach(idOrEmail) {
+  let uid = idOrEmail;
+  if (idOrEmail.includes('@')) uid = (await getAuth().getUserByEmail(idOrEmail)).uid;
+  if (uid.startsWith(COACH_ID_PREFIX)) throw new Error('Imported academy coaches are managed with seed-coaches, not approve-coach.');
+  const snap = await db.collection('coaches').doc(uid).get();
+  if (!snap.exists) throw new Error(`No coach profile coaches/${uid}`);
+  return uid;
 }
 
 // ── Commands ────────────────────────────────────────────────────────────────
@@ -368,6 +385,46 @@ const commands = {
     if (flags['dry-run']) docs.forEach((d) => console.log(`would delete ${d.id}\t${d.data().name}`));
     else if (docs.length) { const b = db.batch(); docs.forEach((d) => b.delete(d.ref)); await b.commit(); }
     console.log(`${docs.length} directory coach(es) ${flags['dry-run'] ? 'would be ' : ''}deleted.`);
+  },
+
+  async coaches() {
+    const snap = await db.collection('coaches').get();
+    const rows = [];
+    for (const d of snap.docs) {
+      const c = d.data();
+      if (d.id.startsWith(COACH_ID_PREFIX)) continue;
+      const approved = c.profileStatus === 'ACTIVE' && c.verificationStatus === 'VERIFIED';
+      if (!flags.all && (approved || ['SUSPENDED', 'DEACTIVATED'].includes(c.profileStatus))) continue;
+      const user = await db.collection('users').doc(d.id).get();
+      const av = await d.ref.collection('availability').get();
+      rows.push([d.id, c.name, user.exists ? user.data().email : '(no user doc)', c.sport, `rate ${c.hourlyRate ?? 0}`,
+        `${c.profileStatus}/${c.verificationStatus}`, c.location || c.city || '', `${av.size} availability range(s)`].join('\t'));
+    }
+    rows.forEach((r) => console.log(r));
+    console.log(`${rows.length} coach account(s)${flags.all ? '' : ' waiting for approval'}.`);
+  },
+
+  async 'approve-coach'() {
+    const uid = await resolveCoach(need(positional[0], 'Usage: approve-coach <uid|email>'));
+    const ref = db.collection('coaches').doc(uid);
+    const snap = await ref.get();
+    const c = snap.data();
+    if (!c.name || !c.sport) throw new Error('This coach has no name or sport yet; ask them to finish their profile first.');
+    await ref.update({
+      profileStatus: 'ACTIVE', verificationStatus: 'VERIFIED', verifiedAt: FieldValue.serverTimestamp(), updatedAt: Date.now(),
+    });
+    await db.collection('coachVerification').doc(uid).set({
+      reviewedBy: ADMIN, reviewedAt: FieldValue.serverTimestamp(), reviewNotes: flags.notes || '', rejectionReason: '',
+    }, { merge: true });
+    console.log(`${uid} (${c.name}): approved. Players can now find and book this coach.`);
+  },
+
+  async 'suspend-coach'() {
+    const uid = await resolveCoach(need(positional[0], 'Usage: suspend-coach <uid|email> --reason "..."'));
+    const reason = need(typeof flags.reason === 'string' ? flags.reason : '', '--reason is required');
+    await db.collection('coaches').doc(uid).update({ profileStatus: 'SUSPENDED', updatedAt: Date.now() });
+    await db.collection('coachVerification').doc(uid).set({ reviewedBy: ADMIN, reviewedAt: FieldValue.serverTimestamp(), reviewNotes: reason }, { merge: true });
+    console.log(`${uid}: suspended (hidden from players).`);
   },
 
   async requests() {

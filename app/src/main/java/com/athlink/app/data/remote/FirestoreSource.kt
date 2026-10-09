@@ -33,14 +33,30 @@ class FirestoreSource @Inject constructor(
      * Coaches players can find and book: VERIFIED (server-side filter) and ACTIVE (checked with
      * [SessionPolicy.isBookable], which also covers documents with unexpected values).
      */
-    suspend fun getCoaches(): Result<List<Coach>> = try {
-        val snapshot = firestore.collection(FirestorePaths.COACHES)
-            .whereEqualTo("verificationStatus", VerificationStatus.VERIFIED.name)
+    suspend fun getCoaches(includePreview: Boolean = false): Result<List<Coach>> = try {
+        val base = firestore.collection(FirestorePaths.COACHES)
+        val snapshot = (if (includePreview) base else base.whereEqualTo("verificationStatus", VerificationStatus.VERIFIED.name))
             .get().await()
         val coaches = snapshot.documents.mapNotNull { doc ->
             doc.toObject(Coach::class.java)?.let { if (it.uid.isBlank()) it.copy(uid = doc.id) else it }
-        }.filter { SessionPolicy.isBookable(it) }
+        }.filter { SessionPolicy.isBookable(it) || (includePreview && SessionPolicy.isPreviewListed(it)) }
         Result.success(coaches)
+    } catch (e: Exception) { Result.failure(e) }
+
+    /** Adds or replaces one weekly range (`coaches/{uid}/availability/{id}`); only the coach can write it. */
+    suspend fun saveAvailability(coachId: String, range: CoachAvailability): Result<CoachAvailability> = try {
+        val col = firestore.collection(FirestorePaths.COACHES).document(coachId).collection(FirestorePaths.AVAILABILITY)
+        val ref = if (range.availabilityId.isBlank()) col.document() else col.document(range.availabilityId)
+        val now = System.currentTimeMillis()
+        val saved = range.copy(availabilityId = ref.id, createdAt = range.createdAt.takeIf { it > 0 } ?: now, updatedAt = now)
+        ref.set(saved).await()
+        Result.success(saved)
+    } catch (e: Exception) { Result.failure(e) }
+
+    suspend fun deleteAvailability(coachId: String, availabilityId: String): Result<Unit> = try {
+        firestore.collection(FirestorePaths.COACHES).document(coachId)
+            .collection(FirestorePaths.AVAILABILITY).document(availabilityId).delete().await()
+        Result.success(Unit)
     } catch (e: Exception) { Result.failure(e) }
 
     /** Weekly availability ranges of a coach (`coaches/{uid}/availability`). */

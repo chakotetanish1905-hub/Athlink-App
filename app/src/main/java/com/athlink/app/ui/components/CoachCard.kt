@@ -81,6 +81,10 @@ fun CoachCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
+                if (!com.athlink.app.data.model.SessionPolicy.isBookable(coach)) {
+                    Text("Not verified yet · waiting for Athlink approval", fontSize = 11.sp, color = AthlinkGold, fontWeight = FontWeight.SemiBold)
+                }
+
                 Spacer(Modifier.height(4.dp))
 
                 // Sport chip

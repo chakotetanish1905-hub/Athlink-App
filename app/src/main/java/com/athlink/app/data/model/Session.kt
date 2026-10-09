@@ -85,6 +85,18 @@ object SessionPolicy {
         else -> false
     }
 
+    /**
+     * Debug-build preview: a registered coach (has an account, not an imported directory coach)
+     * who is not yet approved but not suspended / rejected / deactivated. Shown to players as
+     * "Not verified yet" and never bookable (rules refuse bookings of unverified coaches).
+     */
+    fun isPreviewListed(coach: Coach): Boolean =
+        !isBookable(coach) &&
+            coach.listingSource.isBlank() &&
+            coach.name.isNotBlank() &&
+            coach.profile !in setOf(ProfileStatus.SUSPENDED, ProfileStatus.DEACTIVATED) &&
+            coach.verification !in setOf(VerificationStatus.REJECTED, VerificationStatus.SUSPENDED)
+
     /** A coach can be booked only when ACTIVE + VERIFIED (same as discoverable). */
     fun isBookable(coach: Coach): Boolean =
         CoachVerificationPolicy.isDiscoverable(coach.profile, coach.verification)

@@ -24,6 +24,12 @@ class SessionRepository @Inject constructor(
     suspend fun getCoachAvailability(coachId: String): Result<List<CoachAvailability>> =
         firestoreSource.getCoachAvailability(coachId)
 
+    suspend fun saveAvailability(coachId: String, range: CoachAvailability): Result<CoachAvailability> =
+        firestoreSource.saveAvailability(coachId, range)
+
+    suspend fun deleteAvailability(coachId: String, availabilityId: String): Result<Unit> =
+        firestoreSource.deleteAvailability(coachId, availabilityId)
+
     suspend fun updateSessionStatus(sessionId: String, status: SessionStatus): Result<Unit> =
         firestoreSource.updateSessionStatus(sessionId, status.name)
 }

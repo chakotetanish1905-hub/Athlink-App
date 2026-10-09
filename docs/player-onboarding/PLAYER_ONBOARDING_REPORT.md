@@ -152,7 +152,7 @@ Coach / Organisation signup ─▶ unchanged existing flows
 
 ## 9. Build result
 
-GitHub Actions (JDK 17, dummy `google-services.json`) on commit `d6911a2`:
+GitHub Actions (JDK 17, dummy `google-services.json`) on commits `d6911a2` and `a33383c` (branch head):
 `./gradlew testDebugUnitTest` ✅ and `./gradlew assembleDebug` ✅. Security-rules job ✅.
 (The cloud workspace used for this change has no Android SDK, so CI is the build of record. Build locally in Android Studio with your real `google-services.json` to install it.)
 

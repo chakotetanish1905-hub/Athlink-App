@@ -63,6 +63,12 @@ class PlayerOnboardingScreenUiTest {
         rule.waitForIdle()
     }
 
+    /** Bottom-bar buttons are outside the scrolling content, so they are clicked without scrolling. */
+    private fun press(text: String) {
+        rule.onAllNodesWithText(text)[0].performClick()
+        rule.waitForIdle()
+    }
+
     @Test
     fun resumesAtSportStepAndMainSportCanBeSelected() {
         val vm = launch(FakePlayerStore(user, step1Done))
@@ -77,21 +83,21 @@ class PlayerOnboardingScreenUiTest {
         val store = FakePlayerStore(user, step1Done)
         val vm = launch(store)
         tap("Cricket")
-        tap("Next")
+        press("Next")
         assertEquals(PlayerOnboardingStep.GAME, vm.state.value.step)
         tap("Bowler")
-        tap("Next")
+        press("Next")
         assertEquals(PlayerOnboardingStep.LEVEL, vm.state.value.step)
         tap("Intermediate")
-        tap("Next")
+        press("Next")
         assertEquals(PlayerOnboardingStep.GOALS, vm.state.value.step)
         tap("Find a coach")
-        tap("Next")
+        press("Next")
         assertEquals(PlayerOnboardingStep.TRAINING, vm.state.value.step)
         tap("Group"); tap("Evening"); tap("10 km")
-        tap("Next")
+        press("Next")
         assertEquals(PlayerOnboardingStep.READY, vm.state.value.step)
-        tap("Continue to Athlink")
+        press("Continue to Athlink")
 
         val (finalForm, status) = store.saves.last()
         assertEquals(PlayerProfileStatus.COMPLETE, status)
@@ -104,7 +110,7 @@ class PlayerOnboardingScreenUiTest {
     @Test
     fun nextWithoutMainSportShowsError() {
         val vm = launch(FakePlayerStore(user, step1Done))
-        tap("Next")
+        press("Next")
         assertEquals(PlayerOnboardingStep.SPORT, vm.state.value.step)
         assertNotNull(vm.state.value.errors[PlayerField.PRIMARY_SPORT])
         rule.onNodeWithText("Choose your main sport").assertExists()
@@ -114,8 +120,8 @@ class PlayerOnboardingScreenUiTest {
     fun backKeepsAnswers() {
         val vm = launch(FakePlayerStore(user, step1Done))
         tap("Hockey")
-        tap("Next")
-        tap("Back")
+        press("Next")
+        press("Back")
         assertEquals(PlayerOnboardingStep.SPORT, vm.state.value.step)
         assertEquals("Hockey", vm.state.value.form.primarySport)
     }

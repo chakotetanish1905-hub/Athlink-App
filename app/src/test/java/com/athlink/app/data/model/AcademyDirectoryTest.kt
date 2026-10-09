@@ -86,4 +86,24 @@ class AcademyDirectoryTest {
         assertEquals(AcademyRequestStatus.PENDING, AcademyRequestStatus.fromStored("WHATEVER"))
         assertEquals(PreferredTime.EVENING, PreferredTime.fromStored(null))
     }
+
+    @Test
+    fun importedCoachesAreDirectoryCoachesAndBookable() {
+        val imported = Coach(
+            uid = "dircoach-mr-thomas-badminton", name = "Mr. Thomas", sport = "Badminton",
+            profileStatus = ProfileStatus.ACTIVE.name, verificationStatus = VerificationStatus.VERIFIED.name,
+            listingSource = DIRECTORY_LISTING_SOURCE, academyIds = listOf("dir-vadodara-jn-sports-academy-for-badminton")
+        )
+        assertTrue(imported.isDirectoryCoach)
+        assertTrue(SessionPolicy.isBookable(imported))
+        assertFalse(imported.copy(uid = "realUid123").isDirectoryCoach)
+        assertFalse(imported.copy(listingSource = "").isDirectoryCoach)
+        // No checks were done, so no verification badges are shown.
+        assertTrue(
+            CoachVerificationPolicy.badges(
+                VerificationStatus.VERIFIED, CheckStatus.NOT_SUBMITTED, CheckStatus.NOT_SUBMITTED,
+                CheckStatus.NOT_SUBMITTED, CheckStatus.NOT_SUBMITTED
+            ).isEmpty()
+        )
+    }
 }

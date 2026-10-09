@@ -120,6 +120,16 @@ class FirestoreSource @Inject constructor(
         })
     } catch (e: Exception) { Result.failure(e) }
 
+    /** Bookable coaches linked to an academy (`coaches.academyIds` contains it). */
+    suspend fun getAcademyCoaches(organisationId: String): Result<List<Coach>> = try {
+        val snapshot = firestore.collection(FirestorePaths.COACHES)
+            .whereArrayContains("academyIds", organisationId)
+            .get().await()
+        Result.success(snapshot.documents.mapNotNull { doc ->
+            doc.toObject(Coach::class.java)?.let { if (it.uid.isBlank()) it.copy(uid = doc.id) else it }
+        }.filter { SessionPolicy.isBookable(it) }.sortedBy { it.name.lowercase() })
+    } catch (e: Exception) { Result.failure(e) }
+
     suspend fun getOrganisation(id: String): Result<Organisation?> = try {
         val doc = firestore.collection(FirestorePaths.ORGANISATIONS).document(id).get().await()
         Result.success(doc.takeIf { it.exists() }?.toObject(Organisation::class.java))
@@ -134,6 +144,8 @@ class FirestoreSource @Inject constructor(
             "organisationName" to request.organisationName,
             "organisationLocation" to request.organisationLocation,
             "organisationOwnerUid" to request.organisationOwnerUid,
+            "coachId" to request.coachId,
+            "coachName" to request.coachName,
             "playerId" to request.playerId,
             "playerName" to request.playerName,
             "sport" to request.sport,

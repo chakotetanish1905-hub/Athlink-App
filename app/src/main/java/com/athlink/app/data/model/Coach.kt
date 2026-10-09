@@ -42,6 +42,14 @@ data class Coach(
     /** Years of coaching experience. */
     val experience: Int = 0,
     val currentOrganisation: String = "",
+    /**
+     * Academies (`organisations/{id}`) this coach coaches at. Set only by the admin tool for
+     * imported directory coaches; firestore.rules keep it empty / unchanged for coach accounts.
+     */
+    val academyIds: List<String> = emptyList(),
+    val academyNames: List<String> = emptyList(),
+    /** "" for coaches with an account; [DIRECTORY_LISTING_SOURCE] for imported directory coaches. */
+    val listingSource: String = "",
     val previousOrganisations: List<String> = emptyList(),
     val coachingPosition: String = "",
     val competitionExperience: String = "",

@@ -28,6 +28,9 @@ class AcademyRepository @Inject constructor(
         return firestoreSource.getOrganisation(id)
     }
 
+    suspend fun getAcademyCoaches(academyId: String): Result<List<com.athlink.app.data.model.Coach>> =
+        firestoreSource.getAcademyCoaches(academyId)
+
     suspend fun sendRequest(request: AcademyRequest): Result<String> = firestoreSource.createAcademyRequest(request)
 
     suspend fun getPlayerRequests(playerId: String): Result<List<AcademyRequest>> =

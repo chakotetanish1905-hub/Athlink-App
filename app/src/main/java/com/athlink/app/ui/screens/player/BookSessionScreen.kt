@@ -25,6 +25,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.athlink.app.data.model.BookingSlots
 import com.athlink.app.data.model.SessionPolicy
 import com.athlink.app.data.model.User
+import com.athlink.app.data.model.isDirectoryCoach
 import com.athlink.app.ui.components.PrimaryButton
 import com.athlink.app.ui.theme.*
 import com.athlink.app.viewmodel.BookingViewModel
@@ -41,6 +42,7 @@ fun BookSessionScreen(
     user: User,
     onBack: () -> Unit,
     onBookingConfirmed: () -> Unit,
+    onRequestAtAcademy: (academyId: String, coachId: String) -> Unit = { _, _ -> },
     viewModel: BookingViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -95,7 +97,7 @@ fun BookSessionScreen(
                         Text(
                             buildString {
                                 if (coach.reviewCount > 0) append("★ ${coach.rating} (${coach.reviewCount}) • ")
-                                append("${coach.experience} yrs exp")
+                                append(if (coach.experience > 0) "${coach.experience} yrs exp" else coach.location)
                             },
                             fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -106,6 +108,15 @@ fun BookSessionScreen(
                 }
             }
 
+            if (state.bookable && coach.isDirectoryCoach) {
+                DirectoryCoachCentres(
+                    sport = coach.sport,
+                    academyIds = coach.academyIds,
+                    academyNames = coach.academyNames,
+                    onRequest = { academyId -> onRequestAtAcademy(academyId, coach.uid) }
+                )
+                return@Column
+            }
             if (!state.bookable) {
                 Notice("This coach isn't taking bookings right now (their profile isn't verified and active).")
                 return@Column
@@ -240,4 +251,49 @@ private fun SummaryRow(icon: androidx.compose.ui.graphics.vector.ImageVector, la
         Text("$label:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(72.dp))
         Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
+}
+
+/**
+ * Coaches imported with their academy have no app account or weekly calendar: the player picks a
+ * centre and sends a session request (date + time window), which the academy / Athlink confirms.
+ */
+@Composable
+private fun DirectoryCoachCentres(
+    sport: String,
+    academyIds: List<String>,
+    academyNames: List<String>,
+    onRequest: (String) -> Unit
+) {
+    Text(
+        if (academyIds.size > 1) "Coaches at ${academyIds.size} centres" else "Coaches at",
+        fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp)
+    )
+    Text(
+        "Request a $sport session at the centre that suits you. You choose a date and time window; the academy confirms the time with you.",
+        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp)
+    )
+    Spacer(Modifier.height(8.dp))
+    academyIds.forEachIndexed { i, id ->
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(3.dp)
+        ) {
+            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.School, null, tint = AthlinkOrange)
+                Spacer(Modifier.width(10.dp))
+                Text(academyNames.getOrNull(i) ?: "Academy", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Button(
+                    onClick = { onRequest(id) },
+                    colors = ButtonDefaults.buttonColors(containerColor = AthlinkOrange),
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Request") }
+            }
+        }
+    }
+    if (academyIds.isEmpty()) {
+        Notice("This coach isn't linked to an academy yet.")
+    }
+    Spacer(Modifier.height(24.dp))
 }

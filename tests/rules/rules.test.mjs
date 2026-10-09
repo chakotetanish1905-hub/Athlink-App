@@ -594,6 +594,56 @@ test('ACADEMY: an academy with an account sees and answers only its own requests
   await assertFails(updateDoc(doc(db(PLAYER), 'academyRequests', 'r6'), { status: 'CANCELLED', updatedAt: serverTimestamp() }));
 });
 
+// ── Imported academy coaches (coaches/dircoach-*) ─────────────────────────
+const DIR_COACH = 'dircoach-mr-thomas-badminton';
+async function seedDirectoryCoach(overrides = {}) {
+  await seed(async (f) => setDoc(doc(f, 'coaches', DIR_COACH), {
+    uid: DIR_COACH, name: 'Mr. Thomas', sport: 'Badminton', profileStatus: 'ACTIVE', verificationStatus: 'VERIFIED',
+    verificationLevel: 'LEVEL_0_REGISTERED', academyIds: [DIR_ORG], academyNames: ['Arjun Badminton Academy'],
+    listingSource: 'DIRECTORY_IMPORT', hourlyRate: 0, rating: 0, reviewCount: 0, ...overrides,
+  }));
+}
+
+test('DIRECTORY COACH: a player can request a session with a coach linked to the academy', async () => {
+  await seedDirectoryAcademy(); await seedDirectoryCoach(); await seedPlayer(PLAYER);
+  const f = db(PLAYER);
+  await assertSucceeds(getDocs(query(collection(f, 'coaches'), where('academyIds', 'array-contains', DIR_ORG))));
+  await assertSucceeds(setDoc(doc(f, 'academyRequests', 'c1'), academyRequest('c1', { coachId: DIR_COACH, coachName: 'Mr. Thomas' })));
+});
+
+test('DIRECTORY COACH: the coach must belong to that academy, sport and name', async () => {
+  await seedDirectoryAcademy({ sports: ['Badminton', 'Tennis'] }); await seedPlayer(PLAYER);
+  const f = db(PLAYER);
+  await seedDirectoryCoach({ academyIds: ['dir-somewhere-else'] });
+  await assertFails(setDoc(doc(f, 'academyRequests', 'c2'), academyRequest('c2', { coachId: DIR_COACH, coachName: 'Mr. Thomas' })));
+  await seedDirectoryCoach();
+  await assertFails(setDoc(doc(f, 'academyRequests', 'c2'), academyRequest('c2', { coachId: DIR_COACH, coachName: 'Famous Coach' })));
+  await assertFails(setDoc(doc(f, 'academyRequests', 'c2'), academyRequest('c2', { coachId: DIR_COACH, coachName: 'Mr. Thomas', sport: 'Tennis' })));
+  await assertFails(setDoc(doc(f, 'academyRequests', 'c2'), academyRequest('c2', { coachId: 'nobody', coachName: 'Mr. Thomas' })));
+  await assertFails(setDoc(doc(f, 'academyRequests', 'c2'), academyRequest('c2', { coachId: '', coachName: 'Mr. Thomas' })));
+  await seedDirectoryCoach({ profileStatus: 'DEACTIVATED' });
+  await assertFails(setDoc(doc(f, 'academyRequests', 'c2'), academyRequest('c2', { coachId: DIR_COACH, coachName: 'Mr. Thomas' })));
+});
+
+test('DIRECTORY COACH: nobody can edit an imported coach; coach accounts cannot link themselves to academies', async () => {
+  await seedDirectoryCoach(); await seedPlayer(PLAYER);
+  await assertFails(updateDoc(doc(db(PLAYER), 'coaches', DIR_COACH), { name: 'X' }));
+  await assertFails(deleteDoc(doc(db(PLAYER), 'coaches', DIR_COACH)));
+  const f = db('coach9');
+  const signup = (extra) => {
+    const b = writeBatch(f);
+    b.set(doc(f, 'users', 'coach9'), { uid: 'coach9', name: 'C', email: 'c9@x.org', role: 'COACH', organisationId: '' });
+    b.set(doc(f, 'coaches', 'coach9'), { uid: 'coach9', name: 'C', verificationStatus: 'NOT_SUBMITTED', profileStatus: 'DRAFT',
+      verificationLevel: 'LEVEL_0_REGISTERED', rating: 0, reviewCount: 0, totalEarnings: 0, ...extra });
+    return b.commit();
+  };
+  await assertFails(signup({ academyIds: [DIR_ORG] }));
+  await assertFails(signup({ listingSource: 'DIRECTORY_IMPORT' }));
+  await assertSucceeds(signup({ academyIds: [], academyNames: [], listingSource: '' }));
+  await assertFails(updateDoc(doc(f, 'coaches', 'coach9'), { academyIds: [DIR_ORG] }));
+  await assertSucceeds(updateDoc(doc(f, 'coaches', 'coach9'), { bio: 'Level 2 certified' }));
+});
+
 test('chat: only the two participants can read and write', async () => {
   const thread = `${PLAYER}_coach1`;
   await assertSucceeds(setDoc(doc(db(PLAYER), 'chats', thread, 'messages', 'm1'), { id: 'm1', senderId: PLAYER, receiverId: 'coach1', content: 'hi' }));

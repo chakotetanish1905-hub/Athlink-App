@@ -44,12 +44,13 @@ import java.time.format.DateTimeFormatter
 fun AcademyDetailScreen(
     academyId: String,
     user: User,
+    coachId: String? = null,
     onBack: () -> Unit,
     onOpenBookings: () -> Unit,
     viewModel: AcademyViewModel = hiltViewModel()
 ) {
     val state by viewModel.detail.collectAsState()
-    LaunchedEffect(academyId) { viewModel.openAcademy(academyId) }
+    LaunchedEffect(academyId, coachId) { viewModel.openAcademy(academyId, coachId) }
 
     Scaffold(
         topBar = {
@@ -138,6 +139,27 @@ fun AcademyDetailScreen(
                 }
             }
             FieldError(errors[AcademyRequestForm.Field.SPORT])
+
+            if (state.coaches.isNotEmpty()) {
+                Label("Coach")
+                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        FilterChip(selected = state.selectedCoachId == null, onClick = { viewModel.selectCoach(null) }, label = { Text("Any coach") })
+                    }
+                    items(state.coachesForSport, key = { it.uid }) { coach ->
+                        FilterChip(
+                            selected = state.selectedCoachId == coach.uid,
+                            onClick = { viewModel.selectCoach(coach.uid) },
+                            label = { Text(coach.name) },
+                            leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp)) }
+                        )
+                    }
+                }
+                Text(
+                    "Coaches listed at this academy. The academy confirms the coach and time.",
+                    fontSize = 11.sp, color = AthlinkMedGray, modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
+                )
+            }
 
             Label("Preferred date")
             val dates = remember { (0 until 21).map { LocalDate.now().plusDays(it.toLong()) } }

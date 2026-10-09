@@ -170,10 +170,14 @@ fun AthlinkNavHost() {
 
                 composable(
                     route = NavRoutes.PLAYER_ACADEMY,
-                    arguments = listOf(navArgument("academyId") { type = NavType.StringType })
+                    arguments = listOf(
+                        navArgument("academyId") { type = NavType.StringType },
+                        navArgument("coachId") { type = NavType.StringType; nullable = true; defaultValue = null }
+                    )
                 ) { backStack ->
                     AcademyDetailScreen(
                         academyId = backStack.arguments?.getString("academyId") ?: "",
+                        coachId = backStack.arguments?.getString("coachId"),
                         user = user,
                         onBack = { playerNavController.popBackStack() },
                         onOpenBookings = { playerNavController.navigate(NavRoutes.PLAYER_BOOKINGS) { launchSingleTop = true } }
@@ -198,6 +202,7 @@ fun AthlinkNavHost() {
                         coachId = coachId,
                         user = user,
                         onBack = { playerNavController.popBackStack() },
+                        onRequestAtAcademy = { academyId, cId -> playerNavController.navigate(NavRoutes.playerAcademy(academyId, cId)) },
                         onBookingConfirmed = {
                             playerNavController.navigate(NavRoutes.PLAYER_BOOKINGS) {
                                 popUpTo(NavRoutes.PLAYER_HOME) { inclusive = false }

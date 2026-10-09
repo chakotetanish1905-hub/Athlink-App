@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.athlink.app.data.model.AcademyDirectory
 import com.athlink.app.data.model.AcademyRequest
 import com.athlink.app.data.model.AcademyRequestForm
+import com.athlink.app.data.model.Coach
 import com.athlink.app.data.model.Organisation
 import com.athlink.app.data.model.PreferredTime
 import com.athlink.app.data.model.displayLocation
@@ -43,8 +44,16 @@ data class AcademyDetailState(
     val errors: Map<AcademyRequestForm.Field, String> = emptyMap(),
     val isSending: Boolean = false,
     val sent: Boolean = false,
-    val error: String? = null
-)
+    val error: String? = null,
+    /** Bookable coaches linked to this academy. */
+    val coaches: List<Coach> = emptyList(),
+    /** Coach the request is for, or null for "any coach". */
+    val selectedCoachId: String? = null
+) {
+    val selectedCoach: Coach? get() = coaches.firstOrNull { it.uid == selectedCoachId }
+    /** Coaches teaching the sport chosen in the form. */
+    val coachesForSport: List<Coach> get() = coaches.filter { form.sport.isBlank() || it.sport == form.sport }
+}
 
 @HiltViewModel
 class AcademyViewModel @Inject constructor(
@@ -90,29 +99,49 @@ class AcademyViewModel @Inject constructor(
 
     // ── Detail + request ─────────────────────────────────────────────────
 
-    fun openAcademy(id: String) {
-        if (_detail.value.academy?.organisationId == id && !_detail.value.sent) return
+    /** Opens an academy; [coachId] preselects one of its coaches (coming from a coach's profile). */
+    fun openAcademy(id: String, coachId: String? = null) {
+        val current = _detail.value
+        if (current.academy?.organisationId == id && !current.sent && !current.isLoading) {
+            if (coachId != null) selectCoach(coachId)
+            return
+        }
         viewModelScope.launch {
             _detail.value = AcademyDetailState(isLoading = true)
-            academyRepository.getAcademy(id)
-                .onSuccess { org ->
-                    _detail.value = AcademyDetailState(
-                        isLoading = false, academy = org,
-                        form = AcademyRequestForm(sport = org?.sports?.firstOrNull().orEmpty()),
-                        error = if (org == null) "This academy is no longer listed." else null
-                    )
-                }
-                .onFailure { e ->
-                    _detail.value = AcademyDetailState(isLoading = false, error = ErrorMessages.from(e, "Couldn't load this academy."))
-                }
+            val org = academyRepository.getAcademy(id)
+            val coaches = academyRepository.getAcademyCoaches(id).getOrDefault(emptyList())
+            org.onSuccess { academy ->
+                val preselected = coaches.firstOrNull { it.uid == coachId }
+                _detail.value = AcademyDetailState(
+                    isLoading = false, academy = academy, coaches = coaches,
+                    selectedCoachId = preselected?.uid,
+                    form = AcademyRequestForm(sport = preselected?.sport ?: academy?.sports?.firstOrNull().orEmpty()),
+                    error = if (academy == null) "This academy is no longer listed." else null
+                )
+            }.onFailure { e ->
+                _detail.value = AcademyDetailState(isLoading = false, error = ErrorMessages.from(e, "Couldn't load this academy."))
+            }
         }
+    }
+
+    /** Selects a coach (null = any coach); the request sport follows the coach's sport. */
+    fun selectCoach(coachId: String?) = _detail.update { st ->
+        val coach = st.coaches.firstOrNull { it.uid == coachId }
+        st.copy(
+            selectedCoachId = coach?.uid,
+            form = if (coach != null && coach.sport.isNotBlank()) st.form.copy(sport = coach.sport) else st.form,
+            errors = emptyMap(), error = null
+        )
     }
 
     fun updateForm(transform: (AcademyRequestForm) -> AcademyRequestForm) = _detail.update {
         it.copy(form = transform(it.form), errors = emptyMap(), error = null)
     }
 
-    fun setRequestSport(sport: String) = updateForm { it.copy(sport = sport) }
+    fun setRequestSport(sport: String) = _detail.update { st ->
+        val keepCoach = st.selectedCoach?.sport == sport
+        st.copy(form = st.form.copy(sport = sport), selectedCoachId = if (keepCoach) st.selectedCoachId else null, errors = emptyMap(), error = null)
+    }
     fun setDate(date: String) = updateForm { it.copy(preferredDate = date) }
     fun setTime(time: PreferredTime) = updateForm { it.copy(preferredTime = time) }
     fun setMessage(message: String) = updateForm { it.copy(message = message.take(AcademyRequestForm.MAX_MESSAGE + 20)) }
@@ -129,6 +158,8 @@ class AcademyViewModel @Inject constructor(
             organisationName = org.displayName,
             organisationLocation = org.displayLocation.take(150),
             organisationOwnerUid = org.ownerUid,
+            coachId = s.selectedCoach?.uid.orEmpty(),
+            coachName = s.selectedCoach?.name.orEmpty(),
             playerId = playerId,
             playerName = playerName.trim().take(60),
             sport = s.form.sport,
@@ -147,6 +178,9 @@ class AcademyViewModel @Inject constructor(
 
     /** After the "sent" confirmation: start a fresh form for the same academy. */
     fun resetRequest() = _detail.update {
-        it.copy(sent = false, form = AcademyRequestForm(sport = it.academy?.sports?.firstOrNull().orEmpty()), errors = emptyMap())
+        it.copy(
+            sent = false, errors = emptyMap(), selectedCoachId = null,
+            form = AcademyRequestForm(sport = it.academy?.sports?.firstOrNull().orEmpty())
+        )
     }
 }

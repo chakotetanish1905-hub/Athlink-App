@@ -19,7 +19,7 @@ object NavRoutes {
     const val PLAYER_ONBOARDING = "player_onboarding"
     const val PLAYER_EDIT_PROFILE = "player_edit_profile"
     const val PLAYER_ACADEMIES = "player_academies"
-    const val PLAYER_ACADEMY = "player_academy/{academyId}"
+    const val PLAYER_ACADEMY = "player_academy/{academyId}?coachId={coachId}"
     const val PLAYER_BOOKINGS = "player_bookings"
 
     // Coach
@@ -42,7 +42,8 @@ object NavRoutes {
     const val ORG_REQUESTS = "org_requests"
 
     fun playerBook(coachId: String) = "player_book/$coachId"
-    fun playerAcademy(academyId: String) = "player_academy/$academyId"
+    fun playerAcademy(academyId: String, coachId: String? = null) =
+        "player_academy/$academyId" + (coachId?.let { "?coachId=$it" } ?: "")
     fun chatThread(threadId: String, receiverName: String) = "player_chat_thread/$threadId/$receiverName"
     fun orgEditDraft(draftId: String) = "org_edit_draft/$draftId"
 }

@@ -1,0 +1,198 @@
+{
+  "title": "Athlink coach list: Vadodara and Surat academies",
+  "note": "One row per coach per academy. The same coach (name + sport) at several academies becomes one coach profile linked to all of them.",
+  "coaches": [
+    {
+      "coachName": "Mr. Thomas",
+      "sport": "Badminton",
+      "academyName": "JN Sports Academy for Badminton",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Satish Sir",
+      "sport": "Table Tennis",
+      "academyName": "T Square Table Tennis Academy",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Sanjeev Sir",
+      "sport": "Table Tennis",
+      "academyName": "T Square Table Tennis Academy",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Sagar sir",
+      "sport": "Table Tennis",
+      "academyName": "Shree Table Tennis & Fitness Academy",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Shailesh Sir",
+      "sport": "Table Tennis",
+      "academyName": "Deesha Dynamic Table Tennis Academy",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Hamidali Saiyed",
+      "sport": "Cricket",
+      "academyName": "MDK Cricket Academy",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Harry sir",
+      "sport": "Cricket",
+      "academyName": "DHSCA Cricket Coaching Academy",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Sunil Sir",
+      "sport": "Cricket",
+      "academyName": "Finess Cricket Academy",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Coach Vanraj",
+      "sport": "Cricket",
+      "academyName": "Veer Cricket Academy",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Kiran More",
+      "sport": "Cricket",
+      "academyName": "Kiran More Cricket Academy",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Vimal Upadhyay",
+      "sport": "Football",
+      "academyName": "Baroda Football Academy, VMC Manjalpur Centre",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Naresh Auer",
+      "sport": "Football",
+      "academyName": "Baroda Football Academy, VMC Manjalpur Centre",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Sandeep Desai",
+      "sport": "Football",
+      "academyName": "Baroda Football Academy, VMC Manjalpur Centre",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Vimal Upadhyay",
+      "sport": "Football",
+      "academyName": "Baroda Football Academy (Office)",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Naresh Auer",
+      "sport": "Football",
+      "academyName": "Baroda Football Academy (Office)",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Sandeep Desai",
+      "sport": "Football",
+      "academyName": "Baroda Football Academy (Office)",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Vimal Upadhyay",
+      "sport": "Football",
+      "academyName": "BFA Sports Complex, Manjalpur",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Naresh Auer",
+      "sport": "Football",
+      "academyName": "BFA Sports Complex, Manjalpur",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Sandeep Desai",
+      "sport": "Football",
+      "academyName": "BFA Sports Complex, Manjalpur",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Aziz Sir",
+      "sport": "Football",
+      "academyName": "Dodgers Football Club",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Vimal Upadhyay",
+      "sport": "Football",
+      "academyName": "BFA Sports Complex, Ankodia",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Naresh Auer",
+      "sport": "Football",
+      "academyName": "BFA Sports Complex, Ankodia",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Sandeep Desai",
+      "sport": "Football",
+      "academyName": "BFA Sports Complex, Ankodia",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Mukesh Patel",
+      "sport": "Football",
+      "academyName": "Rangers Football Academy",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Vimal Upadhyay",
+      "sport": "Football",
+      "academyName": "Baroda Football Academy, American School",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Naresh Auer",
+      "sport": "Football",
+      "academyName": "Baroda Football Academy, American School",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Sandeep Desai",
+      "sport": "Football",
+      "academyName": "Baroda Football Academy, American School",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Dharmesh Parmar",
+      "sport": "Tennis",
+      "academyName": "Vadodara Tennis Academy",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Prakash",
+      "sport": "Tennis",
+      "academyName": "ESHANYA Sports Academy (Lawn Tennis & Skating)",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "John",
+      "sport": "Tennis",
+      "academyName": "ESHANYA Sports Academy (Lawn Tennis & Skating)",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Sunil Sir",
+      "sport": "Tennis",
+      "academyName": "BTPA Tennis Academy",
+      "city": "Vadodara"
+    },
+    {
+      "coachName": "Balpreet Singh",
+      "sport": "Football",
+      "academyName": "Balpreet Singh Professional Football Academy",
+      "city": "Surat"
+    }
+  ]
+}

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.athlink.app.data.model.Coach
+import com.athlink.app.data.model.isDirectoryCoach
 import com.athlink.app.ui.theme.*
 
 @Composable
@@ -99,19 +100,21 @@ fun CoachCard(
                 Spacer(Modifier.height(6.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Star, null, tint = AthlinkGold, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(3.dp))
-                    Text(
-                        text = "${coach.rating}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = " (${coach.reviewCount})",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(10.dp))
+                    if (coach.reviewCount > 0) {
+                        Icon(Icons.Default.Star, null, tint = AthlinkGold, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(3.dp))
+                        Text(
+                            text = "${coach.rating}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = " (${coach.reviewCount})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(10.dp))
+                    }
                     Icon(Icons.Default.LocationOn, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
                     Text(
                         text = coach.location,
@@ -130,7 +133,9 @@ fun CoachCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "₹${coach.hourlyRate.toInt()}/hr",
+                        text = if (coach.hourlyRate > 0) "₹${coach.hourlyRate.toInt()}/hr"
+                               else if (coach.isDirectoryCoach) coach.currentOrganisation.ifBlank { "Via academy" }
+                               else "Ask coach",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = AthlinkOrange
@@ -172,9 +177,13 @@ fun CoachCardCompact(coach: Coach, onClick: () -> Unit, modifier: Modifier = Mod
             Text(coach.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(coach.sport, fontSize = 12.sp, color = AthlinkOrange, fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Star, null, tint = AthlinkGold, modifier = Modifier.size(13.dp))
-                Text(" ${coach.rating}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            if (coach.reviewCount > 0) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Star, null, tint = AthlinkGold, modifier = Modifier.size(13.dp))
+                    Text(" ${coach.rating}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            } else {
+                Text(coach.location, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

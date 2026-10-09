@@ -18,6 +18,9 @@ data class AcademyRequest(
     val organisationLocation: String = "",
     /** Empty for directory listings (no account to notify). */
     val organisationOwnerUid: String = "",
+    /** Optional: the academy coach the player asked for (`coaches/{id}` linked to this academy). */
+    val coachId: String = "",
+    val coachName: String = "",
     val playerId: String = "",
     val playerName: String = "",
     val sport: String = "",

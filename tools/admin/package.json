@@ -5,7 +5,7 @@
   "type": "module",
   "bin": { "athlink-admin": "admin.js" },
   "scripts": {
-    "test": "node --test policy.test.js directory.test.js"
+    "test": "node --test policy.test.js directory.test.js coaches.test.js"
   },
   "dependencies": {
     "firebase-admin": "13.4.0"

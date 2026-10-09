@@ -148,6 +148,9 @@ fun AcademyRequestCard(
                     Text(status.label, color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
+            if (request.coachName.isNotBlank()) {
+                Text("Coach: ${request.coachName}", fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+            }
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.CalendarMonth, null, tint = AthlinkOrange, modifier = Modifier.size(14.dp))

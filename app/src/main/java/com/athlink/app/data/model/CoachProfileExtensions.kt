@@ -38,3 +38,11 @@ fun Coach.displayLocation(): String = listOf(coachingArea, city)
     .filter { it.isNotBlank() }
     .joinToString(", ")
     .ifBlank { location }
+
+/**
+ * An imported coach of a directory academy: no Athlink account and no weekly availability, so
+ * players request a session through one of [Coach.academyIds] (an `academyRequests` entry with
+ * this coach) instead of booking a slot.
+ */
+val Coach.isDirectoryCoach: Boolean
+    get() = listingSource == DIRECTORY_LISTING_SOURCE && uid.startsWith("dircoach-")

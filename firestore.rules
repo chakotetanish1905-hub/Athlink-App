@@ -454,11 +454,21 @@ service cloud.firestore {
       return ['verificationLevel', 'identityStatus', 'qualificationStatus', 'experienceStatus',
               'safeguardingStatus', 'rating', 'reviewCount', 'totalEarnings', 'verifiedAt', 'expiresAt'];
     }
+    // Academy links and the directory marker are set only by the admin tool (imported coaches,
+    // ids "dircoach-*", no account). A coach account cannot claim them.
+    function coachDirectoryFieldsUnchanged() {
+      return incoming().get('listingSource', '') == existing().get('listingSource', '')
+        && incoming().get('academyIds', []) == existing().get('academyIds', [])
+        && incoming().get('academyNames', []) == existing().get('academyNames', []);
+    }
     match /coaches/{uid} {
       allow read: if signedIn();
       allow create: if isSelf(uid)
         && roleAfter(uid) == 'COACH'
         && incoming().uid == uid
+        && incoming().get('listingSource', '') == ''
+        && incoming().get('academyIds', []).size() == 0
+        && incoming().get('academyNames', []).size() == 0
         && incoming().verificationStatus in ['NOT_SUBMITTED', 'PENDING']
         && incoming().get('profileStatus', 'DRAFT') == 'DRAFT'
         && incoming().get('verificationLevel', 'LEVEL_0_REGISTERED') == 'LEVEL_0_REGISTERED'
@@ -467,6 +477,7 @@ service cloud.firestore {
         && incoming().get('totalEarnings', 0) == 0;
       allow update: if isSelf(uid)
         && unchanged(coachAdminFields().concat(['uid']))
+        && coachDirectoryFieldsUnchanged()
         && (unchanged(['verificationStatus'])
             || (existing().verificationStatus in ['NOT_SUBMITTED', 'PENDING', 'ACTION_REQUIRED', 'REJECTED', 'EXPIRED']
                 && incoming().verificationStatus == 'UNDER_REVIEW'))
@@ -571,7 +582,7 @@ service cloud.firestore {
             || (resource.data.organisationOwnerUid != '' && resource.data.organisationOwnerUid == request.auth.uid));
       allow create: if isPlayerAccount()
         && incoming().keys().hasOnly(['requestId', 'organisationId', 'organisationName', 'organisationLocation',
-                                      'organisationOwnerUid', 'playerId', 'playerName', 'sport', 'preferredDate',
+                                      'organisationOwnerUid', 'coachId', 'coachName', 'playerId', 'playerName', 'sport', 'preferredDate',
                                       'preferredTime', 'message', 'contactPhone', 'status', 'responseNote',
                                       'createdAt', 'updatedAt'])
         && incoming().requestId == requestId
@@ -584,6 +595,14 @@ service cloud.firestore {
         && incoming().organisationLocation is string && incoming().organisationLocation.size() <= 150
         && incoming().playerName is string && incoming().playerName.size() <= 60
         && incoming().sport is string && incoming().sport in org().sports
+        // Optional coach: must be a bookable coach linked to this academy, for this sport.
+        && ((incoming().get('coachId', '') == '' && incoming().get('coachName', '') == '')
+            || (exists(path('coaches', incoming().coachId))
+              && incoming().organisationId in get(path('coaches', incoming().coachId)).data.get('academyIds', [])
+              && incoming().coachName == get(path('coaches', incoming().coachId)).data.name
+              && incoming().sport == get(path('coaches', incoming().coachId)).data.sport
+              && get(path('coaches', incoming().coachId)).data.get('verificationStatus', '') == 'VERIFIED'
+              && get(path('coaches', incoming().coachId)).data.get('profileStatus', '') == 'ACTIVE'))
         && incoming().preferredDate is string && incoming().preferredDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
         && incoming().preferredTime in ['MORNING', 'AFTERNOON', 'EVENING']
         && incoming().message is string && incoming().message.size() <= 300

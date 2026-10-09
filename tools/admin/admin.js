@@ -19,6 +19,7 @@ import { join, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Status, assertTransition, levelFor, auditActionFor, computeExpiry, isDue } from './policy.js';
 import { checkSeed, directoryId, listingFields, verifiedFields, LISTING_SOURCE, ID_PREFIX } from './directory.js';
+import { groupCoaches, coachFields, newCoachStatus, COACH_ID_PREFIX } from './coaches.js';
 
 const HELP = `
 Athlink admin tool: organisation verification
@@ -40,6 +41,11 @@ Athlink admin tool: organisation verification
                                           Default file: seed/vadodara-surat-academies.json. Safe to re-run: existing
                                           listings get refreshed details/ratings but keep their verification status.
   unseed-directory [--dry-run]            Delete every organisations/dir-* listing (and nothing else)
+  seed-coaches [--file <json>] [--dry-run]
+                                          Import the directory academies' coaches as coaches/dircoach-* (ACTIVE,
+                                          VERIFIED listing, no ID badges) linked to their academies. Run after
+                                          seed-directory. Default file: seed/vadodara-surat-coaches.json
+  unseed-coaches [--dry-run]              Delete every coaches/dircoach-* profile (and nothing else)
   requests [--status PENDING] [--all]     Player session requests to directory academies (no owner account);
                                           --all includes academies that answer in the app
   answer-request <requestId> <ACCEPTED|DECLINED> --note "..."
@@ -325,6 +331,45 @@ const commands = {
     }
     console.log(`${docs.length} directory listing(s) ${flags['dry-run'] ? 'would be' : ''} deleted.`.replace('  ', ' '));
   },
+  async 'seed-coaches'() {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const file = flags.file || join(here, 'seed', 'vadodara-surat-coaches.json');
+    const academies = JSON.parse(readFileSync(join(here, 'seed', 'vadodara-surat-academies.json'), 'utf8')).organisations;
+    const coaches = groupCoaches(JSON.parse(readFileSync(file, 'utf8')).coaches, academies);
+    // Every linked academy must already be in Firestore (run seed-directory first).
+    const academyIds = [...new Set(coaches.flatMap((c) => c.academies.map((a) => a.id)))];
+    const missing = [];
+    for (const id of academyIds) if (!(await orgRef(id).get()).exists) missing.push(id);
+    if (missing.length) throw new Error(`Run seed-directory first. Missing academies:\n  ${missing.join('\n  ')}`);
+    let created = 0, updated = 0, skipped = 0;
+    const batch = db.batch();
+    for (const c of coaches) {
+      const ref = db.collection('coaches').doc(c.id);
+      const snap = await ref.get();
+      if (snap.exists && snap.data().listingSource !== LISTING_SOURCE) { console.warn(`skip ${c.id}: not a directory coach`); skipped++; continue; }
+      const fields = coachFields(c);
+      if (flags['dry-run']) {
+        console.log(`${snap.exists ? 'would refresh' : 'would create'} ${c.id}\t${c.name}\t${c.sport}\t${c.academies.map((a) => a.name).join('; ')}`);
+      } else if (snap.exists) {
+        batch.update(ref, { ...fields, updatedAt: Date.now() });
+      } else {
+        batch.set(ref, { ...fields, ...newCoachStatus(), createdAt: Date.now(), updatedAt: Date.now(), verifiedAt: FieldValue.serverTimestamp() });
+      }
+      if (snap.exists) updated++; else created++;
+    }
+    if (!flags['dry-run']) await batch.commit();
+    const verb = flags['dry-run'] ? 'would be' : 'were';
+    console.log(`${coaches.length} coaches (${academyIds.length} academies): ${created} ${verb} created, ${updated} ${verb} refreshed, ${skipped} skipped.`);
+  },
+
+  async 'unseed-coaches'() {
+    const snap = await db.collection('coaches').where('listingSource', '==', LISTING_SOURCE).get();
+    const docs = snap.docs.filter((d) => d.id.startsWith(COACH_ID_PREFIX));
+    if (flags['dry-run']) docs.forEach((d) => console.log(`would delete ${d.id}\t${d.data().name}`));
+    else if (docs.length) { const b = db.batch(); docs.forEach((d) => b.delete(d.ref)); await b.commit(); }
+    console.log(`${docs.length} directory coach(es) ${flags['dry-run'] ? 'would be ' : ''}deleted.`);
+  },
+
   async requests() {
     const status = flags.status || 'PENDING';
     let q = db.collection('academyRequests').where('status', '==', status);
@@ -334,7 +379,7 @@ const commands = {
     const rows = snap.docs.map((d) => d.data()).sort((a, b) => fmt(a.createdAt).localeCompare(fmt(b.createdAt)));
     for (const r of rows) {
       console.log([
-        r.requestId, r.organisationName, r.organisationLocation, r.sport, `${r.preferredDate} ${r.preferredTime}`,
+        r.requestId, r.organisationName, r.organisationLocation, r.coachName ? `coach: ${r.coachName}` : '', r.sport, `${r.preferredDate} ${r.preferredTime}`,
         `player: ${r.playerName}${r.contactPhone ? ` (${r.contactPhone})` : ''}`, r.message ? `"${r.message}"` : '', `sent ${fmt(r.createdAt)}`,
       ].filter(Boolean).join('\t'));
     }

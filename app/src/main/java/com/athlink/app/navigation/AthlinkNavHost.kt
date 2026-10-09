@@ -21,6 +21,7 @@ import com.athlink.app.ui.screens.organisation.OrgDashboardScreen
 import com.athlink.app.ui.screens.organisation.OrgEventsScreen
 import com.athlink.app.ui.screens.organisation.OrgGateScreen
 import com.athlink.app.ui.screens.organisation.OrgProfileScreen
+import com.athlink.app.ui.screens.organisation.OrgRequestsScreen
 import com.athlink.app.ui.screens.organisation.OrganisationOnboardingScreen
 import com.athlink.app.ui.screens.organisation.OrganisationVerificationStatusScreen
 import com.athlink.app.ui.screens.player.*
@@ -141,6 +142,9 @@ fun AthlinkNavHost() {
                         user = user,
                         navController = playerNavController,
                         onCoachClick = { coachId -> playerNavController.navigate(NavRoutes.playerBook(coachId)) },
+                        onOpenBookings = { playerNavController.navigate(NavRoutes.PLAYER_BOOKINGS) { launchSingleTop = true } },
+                        onOpenAcademies = { playerNavController.navigate(NavRoutes.PLAYER_ACADEMIES) { launchSingleTop = true } },
+                        onOpenAcademy = { id -> playerNavController.navigate(NavRoutes.playerAcademy(id)) },
                         onLogout = {
                             authViewModel.logout()
                             rootNavController.navigate(NavRoutes.LOGIN) { popUpTo(0) { inclusive = true } }
@@ -151,7 +155,37 @@ fun AthlinkNavHost() {
                 composable(NavRoutes.PLAYER_SEARCH) {
                     SearchCoachScreen(
                         onBookCoach = { coach -> playerNavController.navigate(NavRoutes.playerBook(coach.uid)) },
+                        onOpenAcademies = { playerNavController.navigate(NavRoutes.PLAYER_ACADEMIES) { launchSingleTop = true } },
                         onBack = { playerNavController.navigate(NavRoutes.PLAYER_HOME) { launchSingleTop = true } }
+                    )
+                }
+
+                composable(NavRoutes.PLAYER_ACADEMIES) {
+                    AcademiesScreen(
+                        user = user,
+                        navController = playerNavController,
+                        onOpenAcademy = { id -> playerNavController.navigate(NavRoutes.playerAcademy(id)) }
+                    )
+                }
+
+                composable(
+                    route = NavRoutes.PLAYER_ACADEMY,
+                    arguments = listOf(navArgument("academyId") { type = NavType.StringType })
+                ) { backStack ->
+                    AcademyDetailScreen(
+                        academyId = backStack.arguments?.getString("academyId") ?: "",
+                        user = user,
+                        onBack = { playerNavController.popBackStack() },
+                        onOpenBookings = { playerNavController.navigate(NavRoutes.PLAYER_BOOKINGS) { launchSingleTop = true } }
+                    )
+                }
+
+                composable(NavRoutes.PLAYER_BOOKINGS) {
+                    PlayerBookingsScreen(
+                        user = user,
+                        onBack = { playerNavController.popBackStack() },
+                        onFindCoach = { playerNavController.navigate(NavRoutes.PLAYER_SEARCH) { launchSingleTop = true } },
+                        onFindAcademy = { playerNavController.navigate(NavRoutes.PLAYER_ACADEMIES) { launchSingleTop = true } }
                     )
                 }
 
@@ -165,7 +199,7 @@ fun AthlinkNavHost() {
                         user = user,
                         onBack = { playerNavController.popBackStack() },
                         onBookingConfirmed = {
-                            playerNavController.navigate(NavRoutes.PLAYER_HOME) {
+                            playerNavController.navigate(NavRoutes.PLAYER_BOOKINGS) {
                                 popUpTo(NavRoutes.PLAYER_HOME) { inclusive = false }
                             }
                         }
@@ -308,8 +342,13 @@ fun AthlinkNavHost() {
                         navController = orgNavController,
                         onLogout = logout,
                         onCreateEvent = { orgNavController.navigate(NavRoutes.ORG_CREATE_EVENT) },
-                        onOpenVerification = openVerification
+                        onOpenVerification = openVerification,
+                        onOpenRequests = { orgNavController.navigate(NavRoutes.ORG_REQUESTS) { launchSingleTop = true } }
                     )
+                }
+
+                composable(NavRoutes.ORG_REQUESTS) {
+                    OrgRequestsScreen(user = user, onBack = { orgNavController.popBackStack() })
                 }
 
                 composable(NavRoutes.ORG_EVENTS) {

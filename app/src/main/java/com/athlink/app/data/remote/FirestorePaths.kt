@@ -35,6 +35,10 @@ object FirestorePaths {
     // ── Events ──────────────────────────────────────────────────────────
     const val EVENTS = "events"              // published (verified organisations only)
     const val EVENT_DRAFTS = "eventDrafts"   // private drafts (owner only)
+
+    // ── Bookings ────────────────────────────────────────────────────────
+    const val SESSIONS = "sessions"                  // coach bookings, id = {coachId}_{date}_{HHmm}
+    const val ACADEMY_REQUESTS = "academyRequests"   // player -> academy session requests
 }
 
 /** Cloud Storage paths. Public and private assets are under different roots. */

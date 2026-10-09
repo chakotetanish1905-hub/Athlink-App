@@ -36,11 +36,16 @@ fun ManageSessionsScreen(
     val tabs = listOf("Requests", "Confirmed", "All")
 
     LaunchedEffect(user.uid) { viewModel.loadCoachSessions(user.uid) }
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(state.message, state.error) {
+        val text = state.message ?: state.error
+        if (text != null) { snackbar.showSnackbar(text); viewModel.clearMessage() }
+    }
 
     val filteredSessions = when (selectedTab) {
         0 -> state.sessions.filter { it.status == SessionStatus.PENDING }
         1 -> state.sessions.filter { it.status == SessionStatus.CONFIRMED }
-        else -> state.sessions
+        else -> state.sessions.sortedWith(compareByDescending<com.athlink.app.data.model.Session> { it.date }.thenByDescending { it.startTime })
     }
 
     Scaffold(
@@ -51,6 +56,7 @@ fun ManageSessionsScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
+        snackbarHost = { SnackbarHost(snackbar) },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -107,6 +113,20 @@ fun ManageSessionsScreen(
                                 onAccept = { viewModel.updateStatus(session.id, SessionStatus.CONFIRMED) },
                                 onReject = { viewModel.updateStatus(session.id, SessionStatus.REJECTED) }
                             )
+                        } else if (session.status == SessionStatus.CONFIRMED) {
+                            Column {
+                                SessionCard(session)
+                                Row(Modifier.align(Alignment.End)) {
+                                    TextButton(
+                                        onClick = { viewModel.updateStatus(session.id, SessionStatus.CANCELLED) },
+                                        enabled = state.updatingId != session.id
+                                    ) { Text("Cancel", color = AthlinkRed) }
+                                    TextButton(
+                                        onClick = { viewModel.updateStatus(session.id, SessionStatus.COMPLETED) },
+                                        enabled = state.updatingId != session.id
+                                    ) { Text("Mark completed", color = AthlinkGreen) }
+                                }
+                            }
                         } else {
                             SessionCard(session)
                         }

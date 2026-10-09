@@ -40,6 +40,10 @@ Athlink admin tool: organisation verification
                                           Default file: seed/vadodara-surat-academies.json. Safe to re-run: existing
                                           listings get refreshed details/ratings but keep their verification status.
   unseed-directory [--dry-run]            Delete every organisations/dir-* listing (and nothing else)
+  requests [--status PENDING] [--all]     Player session requests to directory academies (no owner account);
+                                          --all includes academies that answer in the app
+  answer-request <requestId> <ACCEPTED|DECLINED> --note "..."
+                                          Record the academy's answer (after calling it) for a directory academy
 `;
 
 // ── Args ────────────────────────────────────────────────────────────────────
@@ -320,6 +324,39 @@ const commands = {
       }
     }
     console.log(`${docs.length} directory listing(s) ${flags['dry-run'] ? 'would be' : ''} deleted.`.replace('  ', ' '));
+  },
+  async requests() {
+    const status = flags.status || 'PENDING';
+    let q = db.collection('academyRequests').where('status', '==', status);
+    if (!flags.all) q = q.where('organisationOwnerUid', '==', '');
+    const snap = await q.get();
+    if (snap.empty) { console.log(`No ${status} requests${flags.all ? '' : ' to directory academies'}.`); return; }
+    const rows = snap.docs.map((d) => d.data()).sort((a, b) => fmt(a.createdAt).localeCompare(fmt(b.createdAt)));
+    for (const r of rows) {
+      console.log([
+        r.requestId, r.organisationName, r.organisationLocation, r.sport, `${r.preferredDate} ${r.preferredTime}`,
+        `player: ${r.playerName}${r.contactPhone ? ` (${r.contactPhone})` : ''}`, r.message ? `"${r.message}"` : '', `sent ${fmt(r.createdAt)}`,
+      ].filter(Boolean).join('\t'));
+    }
+    console.log(`${rows.length} request(s).`);
+  },
+
+  async 'answer-request'() {
+    const id = need(positional[0], 'Usage: answer-request <requestId> <ACCEPTED|DECLINED> --note "..."');
+    const status = need(positional[1], 'Give ACCEPTED or DECLINED');
+    if (!['ACCEPTED', 'DECLINED'].includes(status)) { console.error('Status must be ACCEPTED or DECLINED'); process.exit(1); }
+    const note = need(typeof flags.note === 'string' ? flags.note.trim() : '', '--note is required (what the academy said: time, venue, fees...)');
+    if (note.length > 300) { console.error('--note must be 300 characters or fewer'); process.exit(1); }
+    const ref = db.collection('academyRequests').doc(id);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new Error(`No request ${id}`);
+      const r = snap.data();
+      if (r.status !== 'PENDING') throw new Error(`Request is ${r.status}, not PENDING`);
+      if (r.organisationOwnerUid) throw new Error('This academy has an Athlink account and answers in the app.');
+      tx.update(ref, { status, responseNote: note, updatedAt: FieldValue.serverTimestamp(), answeredBy: ADMIN });
+    });
+    console.log(`${id}: ${status}`);
   },
 };
 

@@ -1,6 +1,7 @@
 package com.athlink.app.ui.screens.organisation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -47,6 +48,7 @@ fun OrgDashboardScreen(
     onLogout: () -> Unit,
     onCreateEvent: () -> Unit,
     onOpenVerification: (editable: Boolean) -> Unit,
+    onOpenRequests: () -> Unit = {},
     orgViewModel: OrganisationViewModel = hiltViewModel(),
     eventsViewModel: OrganisationEventsViewModel = hiltViewModel()
 ) {
@@ -118,6 +120,24 @@ fun OrgDashboardScreen(
                     OrgStatCard("Published", "${eventState.published.size}", Icons.Default.EmojiEvents, Modifier.weight(1f))
                     OrgStatCard("Drafts", "${eventState.drafts.size}", Icons.Default.Drafts, Modifier.weight(1f))
                     OrgStatCard("Registered", "${eventState.totalRegistered}", Icons.Default.People, Modifier.weight(1f))
+                }
+            }
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clickable(onClick = onOpenRequests),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(3.dp)
+                ) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Inbox, null, tint = AthlinkOrange)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Session requests", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text("Players asking to train with you", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Icon(Icons.Default.ChevronRight, null)
+                    }
                 }
             }
             item {

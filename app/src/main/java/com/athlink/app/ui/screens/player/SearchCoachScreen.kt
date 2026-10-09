@@ -1,6 +1,7 @@
 package com.athlink.app.ui.screens.player
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -19,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.athlink.app.data.model.Coach
-import com.athlink.app.data.model.DummyData
+import com.athlink.app.data.model.Sports
 import com.athlink.app.ui.components.CoachCard
 import com.athlink.app.ui.theme.*
 import com.athlink.app.viewmodel.CoachViewModel
@@ -28,10 +29,11 @@ import com.athlink.app.viewmodel.CoachViewModel
 fun SearchCoachScreen(
     onBack: () -> Unit,
     onBookCoach: (Coach) -> Unit,
+    onOpenAcademies: () -> Unit = {},
     viewModel: CoachViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val sports = listOf("All") + DummyData.sports.take(8)
+    val sports = listOf("All") + Sports.ALL
 
     Column(Modifier.fillMaxSize().background(SurfaceDark)) {
         // Top Bar + Search
@@ -100,7 +102,14 @@ fun SearchCoachScreen(
 
         // Results count
         Row(Modifier.padding(horizontal = 20.dp)) {
-            Text("${state.filteredCoaches.size} coaches found", color = TextMuted, fontSize = 13.sp)
+            Text(
+                "${state.filteredCoaches.size} verified ${if (state.filteredCoaches.size == 1) "coach" else "coaches"}",
+                color = TextMuted, fontSize = 13.sp, modifier = Modifier.weight(1f)
+            )
+            Text(
+                "Academies →", color = AthBlue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable(onClick = onOpenAcademies)
+            )
         }
         Spacer(Modifier.height(10.dp))
 
@@ -108,6 +117,24 @@ fun SearchCoachScreen(
         if (state.isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = AthBlue)
+            }
+        } else if (state.filteredCoaches.isEmpty()) {
+            Column(
+                Modifier.fillMaxWidth().padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    state.error ?: if (state.coaches.isEmpty()) "No verified coaches yet" else "No coaches match your search",
+                    color = TextPrimary, fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Only coaches verified by Athlink appear here. You can also request a session at a listed academy.",
+                    color = TextMuted, fontSize = 13.sp
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(onClick = onOpenAcademies) { Text("Browse academies") }
+                if (state.error != null) TextButton(onClick = { viewModel.loadCoaches() }) { Text("Retry") }
             }
         } else {
             LazyColumn(

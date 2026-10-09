@@ -463,13 +463,135 @@ test('DIRECTORY: an organisation account cannot mark itself a listing or set a r
   await assertSucceeds(updateDoc(doc(f, 'organisations', ORG), { legalName: 'Andheri Sports Academy Pvt', updatedAt: serverTimestamp() }));
 });
 
-test('sessions: player books, coach updates status only', async () => {
-  const s = { id: 's1', coachId: 'coach1', playerId: PLAYER, status: 'PENDING', price: 800 };
-  await assertSucceeds(setDoc(doc(db(PLAYER), 'sessions', 's1'), s));
-  await assertSucceeds(getDocs(query(collection(db('coach1'), 'sessions'), where('coachId', '==', 'coach1'))));
-  await assertSucceeds(updateDoc(doc(db('coach1'), 'sessions', 's1'), { status: 'CONFIRMED' }));
-  await assertFails(updateDoc(doc(db('coach1'), 'sessions', 's1'), { price: 1 }));
-  await assertFails(getDoc(doc(db('stranger'), 'sessions', 's1')));
+// ── Coach bookings (sessions) ──────────────────────────────────────────────
+const COACH = 'coach1';
+const SLOT = `${COACH}_2026-12-01_1700`;
+async function seedCoach(overrides = {}) {
+  await seed(async (f) => {
+    await setDoc(doc(f, 'users', COACH), { uid: COACH, name: 'Ravi', email: 'c@x.org', role: 'COACH', organisationId: '' });
+    await setDoc(doc(f, 'coaches', COACH), {
+      uid: COACH, name: 'Ravi Coach', sport: 'Cricket', hourlyRate: 800, profileStatus: 'ACTIVE', verificationStatus: 'VERIFIED',
+      ...overrides,
+    });
+  });
+}
+function booking(overrides = {}) {
+  return {
+    id: SLOT, coachId: COACH, coachName: 'Ravi Coach', playerId: PLAYER, playerName: 'Asha Patel', sport: 'Cricket',
+    date: '2026-12-01', timeSlot: '17:00 – 18:00', startTime: '17:00', endTime: '18:00', status: 'PENDING',
+    price: 800, location: 'Gotri, Vadodara', notes: '', createdAt: Date.now(), ...overrides,
+  };
+}
+
+test('BOOKING: a player books a verified coach slot; coach and player can read it, others cannot', async () => {
+  await seedCoach(); await seedPlayer(PLAYER);
+  await assertSucceeds(setDoc(doc(db(PLAYER), 'sessions', SLOT), booking()));
+  await assertSucceeds(getDocs(query(collection(db(PLAYER), 'sessions'), where('playerId', '==', PLAYER))));
+  await assertSucceeds(getDocs(query(collection(db(COACH), 'sessions'), where('coachId', '==', COACH))));
+  await assertFails(getDoc(doc(db('stranger'), 'sessions', SLOT)));
+});
+
+test('BOOKING: the id, price, coach name and status must be genuine', async () => {
+  await seedCoach(); await seedPlayer(PLAYER);
+  const f = db(PLAYER);
+  await assertFails(setDoc(doc(f, 'sessions', 'random'), booking({ id: 'random' })));
+  await assertFails(setDoc(doc(f, 'sessions', SLOT), booking({ price: 1 })));
+  await assertFails(setDoc(doc(f, 'sessions', SLOT), booking({ coachName: 'Someone Famous' })));
+  await assertFails(setDoc(doc(f, 'sessions', SLOT), booking({ status: 'CONFIRMED' })));
+  await assertFails(setDoc(doc(f, 'sessions', SLOT), booking({ playerId: 'otherPlayer' })));
+  await assertFails(setDoc(doc(f, 'sessions', SLOT), booking({ extra: true })));
+});
+
+test('BOOKING: unverified / inactive coaches cannot be booked; only player accounts can book', async () => {
+  await seedPlayer(PLAYER);
+  await seedCoach({ verificationStatus: 'UNDER_REVIEW' });
+  await assertFails(setDoc(doc(db(PLAYER), 'sessions', SLOT), booking()));
+  await seedCoach({ profileStatus: 'DEACTIVATED' });
+  await assertFails(setDoc(doc(db(PLAYER), 'sessions', SLOT), booking()));
+  await seedCoach();
+  await seedOrg(ORG);
+  await assertFails(setDoc(doc(db(ORG), 'sessions', SLOT), booking({ playerId: ORG })));
+});
+
+test('BOOKING: a held slot cannot be taken; a rejected / cancelled slot can be rebooked', async () => {
+  await seedCoach(); await seedPlayer(PLAYER); await seedPlayer('player2');
+  await assertSucceeds(setDoc(doc(db(PLAYER), 'sessions', SLOT), booking()));
+  const other = booking({ playerId: 'player2', playerName: 'Bina' });
+  await assertFails(setDoc(doc(db('player2'), 'sessions', SLOT), other));
+  await assertSucceeds(updateDoc(doc(db(COACH), 'sessions', SLOT), { status: 'REJECTED' }));
+  await assertSucceeds(setDoc(doc(db('player2'), 'sessions', SLOT), other));
+});
+
+test('BOOKING: coach transitions and player cancel only', async () => {
+  await seedCoach(); await seedPlayer(PLAYER);
+  await assertSucceeds(setDoc(doc(db(PLAYER), 'sessions', SLOT), booking()));
+  const coachRef = doc(db(COACH), 'sessions', SLOT);
+  await assertFails(updateDoc(coachRef, { status: 'COMPLETED' }));            // must confirm first
+  await assertFails(updateDoc(coachRef, { price: 1 }));
+  await assertFails(updateDoc(doc(db(PLAYER), 'sessions', SLOT), { status: 'CONFIRMED' })); // player cannot confirm
+  await assertSucceeds(updateDoc(coachRef, { status: 'CONFIRMED' }));
+  await assertSucceeds(updateDoc(doc(db(PLAYER), 'sessions', SLOT), { status: 'CANCELLED' }));
+  await assertFails(updateDoc(coachRef, { status: 'COMPLETED' }));            // cancelled is final
+  await assertFails(deleteDoc(doc(db(PLAYER), 'sessions', SLOT)));
+});
+
+// ── Academy requests ──────────────────────────────────────────────────────
+const DIR_ORG = 'dir-vadodara-arjun-badminton-academy';
+async function seedDirectoryAcademy(overrides = {}) {
+  await seed(async (f) => setDoc(doc(f, 'organisations', DIR_ORG), orgProfile(DIR_ORG, {
+    ownerUid: '', displayName: 'Arjun Badminton Academy', sports: ['Badminton'], listingSource: 'DIRECTORY_IMPORT',
+    ...verified, ...overrides,
+  })));
+}
+function academyRequest(id, overrides = {}) {
+  return {
+    requestId: id, organisationId: DIR_ORG, organisationName: 'Arjun Badminton Academy', organisationLocation: 'Tandalja, Vadodara',
+    organisationOwnerUid: '', playerId: PLAYER, playerName: 'Asha Patel', sport: 'Badminton', preferredDate: '2026-12-01',
+    preferredTime: 'EVENING', message: 'Beginner, weekdays', contactPhone: '9876543210', status: 'PENDING', responseNote: '',
+    createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...overrides,
+  };
+}
+
+test('ACADEMY: a player can request a session at a listed academy and withdraw it', async () => {
+  await seedDirectoryAcademy(); await seedPlayer(PLAYER);
+  const f = db(PLAYER);
+  await assertSucceeds(setDoc(doc(f, 'academyRequests', 'r1'), academyRequest('r1')));
+  await assertSucceeds(getDocs(query(collection(f, 'academyRequests'), where('playerId', '==', PLAYER))));
+  await assertFails(getDoc(doc(db('stranger'), 'academyRequests', 'r1')));
+  await assertFails(updateDoc(doc(f, 'academyRequests', 'r1'), { status: 'ACCEPTED', updatedAt: serverTimestamp() }));
+  await assertSucceeds(updateDoc(doc(f, 'academyRequests', 'r1'), { status: 'CANCELLED', updatedAt: serverTimestamp() }));
+});
+
+test('ACADEMY: requests must match the academy and be well formed', async () => {
+  await seedDirectoryAcademy(); await seedPlayer(PLAYER);
+  const f = db(PLAYER);
+  await assertFails(setDoc(doc(f, 'academyRequests', 'r2'), academyRequest('r2', { sport: 'Cricket' })));
+  await assertFails(setDoc(doc(f, 'academyRequests', 'r2'), academyRequest('r2', { organisationName: 'Fake' })));
+  await assertFails(setDoc(doc(f, 'academyRequests', 'r2'), academyRequest('r2', { organisationOwnerUid: 'attacker' })));
+  await assertFails(setDoc(doc(f, 'academyRequests', 'r2'), academyRequest('r2', { status: 'ACCEPTED' })));
+  await assertFails(setDoc(doc(f, 'academyRequests', 'r2'), academyRequest('r2', { contactPhone: '12345' })));
+  await assertFails(setDoc(doc(f, 'academyRequests', 'r2'), academyRequest('r2', { message: 'x'.repeat(301) })));
+  await assertFails(setDoc(doc(f, 'academyRequests', 'r2'), academyRequest('r2', { playerId: 'someoneElse' })));
+  await assertFails(setDoc(doc(f, 'academyRequests', 'r3'), academyRequest('r2')));
+});
+
+test('ACADEMY: unverified academies cannot receive requests; non-players cannot send them', async () => {
+  await seedDirectoryAcademy({ verificationStatus: 'SUSPENDED' }); await seedPlayer(PLAYER);
+  await assertFails(setDoc(doc(db(PLAYER), 'academyRequests', 'r4'), academyRequest('r4')));
+  await seedDirectoryAcademy(); await seedCoach();
+  await assertFails(setDoc(doc(db(COACH), 'academyRequests', 'r5'), academyRequest('r5', { playerId: COACH })));
+});
+
+test('ACADEMY: an academy with an account sees and answers only its own requests', async () => {
+  await seedOrg(ORG, { ...verified, sports: ['Cricket'] }); await seedOrg(OTHER, verified); await seedPlayer(PLAYER);
+  const req = academyRequest('r6', { organisationId: ORG, organisationName: 'ASA', organisationOwnerUid: ORG, sport: 'Cricket' });
+  await assertSucceeds(setDoc(doc(db(PLAYER), 'academyRequests', 'r6'), req));
+  await assertSucceeds(getDocs(query(collection(db(ORG), 'academyRequests'), where('organisationOwnerUid', '==', ORG))));
+  await assertFails(getDoc(doc(db(OTHER), 'academyRequests', 'r6')));
+  await assertFails(updateDoc(doc(db(OTHER), 'academyRequests', 'r6'), { status: 'ACCEPTED', responseNote: '', updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(ORG), 'academyRequests', 'r6'), { sport: 'Tennis', updatedAt: serverTimestamp() }));
+  await assertSucceeds(updateDoc(doc(db(ORG), 'academyRequests', 'r6'), { status: 'ACCEPTED', responseNote: 'See you at 5 pm', updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(PLAYER), 'academyRequests', 'r6'), { status: 'CANCELLED', updatedAt: serverTimestamp() }));
 });
 
 test('chat: only the two participants can read and write', async () => {

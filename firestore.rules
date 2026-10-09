@@ -511,15 +511,101 @@ service cloud.firestore {
     // ═════════════════════════════════════════════════════════════════════════
     // SESSIONS (bookings) and CHAT
     // ═════════════════════════════════════════════════════════════════════════
+    // A booking holds one coach slot. Its id is "{coachId}_{date}_{HHmm}" (SessionPolicy.slotId),
+    // so a slot can be held by only one PENDING / CONFIRMED booking. A REJECTED / CANCELLED booking
+    // frees the slot: the next booking for it overwrites that document.
+    function isPlayerAccount() {
+      return signedIn() && exists(path('users', request.auth.uid)) && roleOf(request.auth.uid) == 'PLAYER';
+    }
+    function validNewBooking(sessionId) {
+      let s = incoming();
+      let coach = get(path('coaches', s.coachId)).data;
+      return isPlayerAccount()
+        && s.keys().hasOnly(['id', 'coachId', 'coachName', 'playerId', 'playerName', 'sport', 'date', 'timeSlot',
+                             'startTime', 'endTime', 'status', 'price', 'location', 'notes', 'createdAt'])
+        && s.id == sessionId
+        && s.playerId == request.auth.uid
+        && s.coachId != request.auth.uid
+        && s.status == 'PENDING'
+        && s.date is string && s.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && s.startTime is string && s.startTime.matches('^[0-2][0-9]:[0-5][0-9]$')
+        && s.endTime is string && s.endTime.matches('^[0-2][0-9]:[0-5][0-9]$')
+        && sessionId == s.coachId + '_' + s.date + '_' + s.startTime.replace(':', '')
+        && exists(path('coaches', s.coachId))
+        && coach.get('verificationStatus', '') == 'VERIFIED'
+        && coach.get('profileStatus', '') == 'ACTIVE'
+        && s.coachName == coach.get('name', '')
+        && s.price == coach.get('hourlyRate', 0)
+        && s.playerName is string && s.playerName.size() <= 60
+        && s.get('notes', '') is string && s.get('notes', '').size() <= 300;
+    }
+
     match /sessions/{sessionId} {
       allow read: if signedIn()
         && (resource.data.playerId == request.auth.uid || resource.data.coachId == request.auth.uid);
-      allow create: if signedIn()
+      allow create: if validNewBooking(sessionId);
+      allow update: if
+        // Coach: PENDING -> CONFIRMED / REJECTED, CONFIRMED -> COMPLETED / CANCELLED.
+        (signedIn() && existing().coachId == request.auth.uid
+          && changedKeys().hasOnly(['status'])
+          && ((existing().status == 'PENDING' && incoming().status in ['CONFIRMED', 'REJECTED'])
+              || (existing().status == 'CONFIRMED' && incoming().status in ['COMPLETED', 'CANCELLED'])))
+        // Player: cancel their own pending / confirmed booking.
+        || (signedIn() && existing().playerId == request.auth.uid
+          && changedKeys().hasOnly(['status'])
+          && existing().status in ['PENDING', 'CONFIRMED'] && incoming().status == 'CANCELLED')
+        // Anyone (a player) may take a freed slot with a fresh booking.
+        || (existing().status in ['REJECTED', 'CANCELLED'] && validNewBooking(sessionId));
+      allow delete: if false;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // ACADEMY REQUESTS: a player asks a listed (verified) academy for a session.
+    // Readable by the player and the academy's owner account. Imported directory academies have
+    // no owner (organisationOwnerUid == ''), so Athlink follows those up via the admin tool.
+    // ═════════════════════════════════════════════════════════════════════════
+    match /academyRequests/{requestId} {
+      function org() { return get(path('organisations', incoming().organisationId)).data; }
+      allow read: if signedIn()
+        && (resource.data.playerId == request.auth.uid
+            || (resource.data.organisationOwnerUid != '' && resource.data.organisationOwnerUid == request.auth.uid));
+      allow create: if isPlayerAccount()
+        && incoming().keys().hasOnly(['requestId', 'organisationId', 'organisationName', 'organisationLocation',
+                                      'organisationOwnerUid', 'playerId', 'playerName', 'sport', 'preferredDate',
+                                      'preferredTime', 'message', 'contactPhone', 'status', 'responseNote',
+                                      'createdAt', 'updatedAt'])
+        && incoming().requestId == requestId
         && incoming().playerId == request.auth.uid
-        && incoming().status == 'PENDING';
+        && exists(path('organisations', incoming().organisationId))
+        && orgCanPublishData(org())
+        && incoming().organisationName == org().displayName
+        && incoming().organisationOwnerUid == org().ownerUid
+        && incoming().organisationOwnerUid != request.auth.uid
+        && incoming().organisationLocation is string && incoming().organisationLocation.size() <= 150
+        && incoming().playerName is string && incoming().playerName.size() <= 60
+        && incoming().sport is string && incoming().sport in org().sports
+        && incoming().preferredDate is string && incoming().preferredDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && incoming().preferredTime in ['MORNING', 'AFTERNOON', 'EVENING']
+        && incoming().message is string && incoming().message.size() <= 300
+        && incoming().contactPhone is string
+        && (incoming().contactPhone == '' || incoming().contactPhone.matches('^(\\+91)?[6-9][0-9]{9}$'))
+        && incoming().status == 'PENDING'
+        && incoming().responseNote == ''
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
       allow update: if signedIn()
-        && (existing().coachId == request.auth.uid || existing().playerId == request.auth.uid)
-        && changedKeys().hasOnly(['status']);
+        && incoming().updatedAt == request.time
+        && (
+          // Player withdraws a pending request.
+          (existing().playerId == request.auth.uid
+            && changedKeys().hasOnly(['status', 'updatedAt'])
+            && existing().status == 'PENDING' && incoming().status == 'CANCELLED')
+          // Academy owner answers a pending request.
+          || (existing().organisationOwnerUid != '' && existing().organisationOwnerUid == request.auth.uid
+            && changedKeys().hasOnly(['status', 'responseNote', 'updatedAt'])
+            && existing().status == 'PENDING' && incoming().status in ['ACCEPTED', 'DECLINED']
+            && incoming().responseNote is string && incoming().responseNote.size() <= 300)
+        );
       allow delete: if false;
     }
 

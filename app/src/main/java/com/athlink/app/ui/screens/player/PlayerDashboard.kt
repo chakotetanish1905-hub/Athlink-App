@@ -21,10 +21,11 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import com.athlink.app.data.model.DummyData
+import com.athlink.app.data.model.Sports
 import com.athlink.app.data.model.User
 import com.athlink.app.ui.components.*
 import com.athlink.app.ui.theme.*
+import com.athlink.app.viewmodel.AcademyViewModel
 import com.athlink.app.viewmodel.CoachViewModel
 import com.athlink.app.viewmodel.SessionViewModel
 
@@ -34,17 +35,25 @@ fun PlayerDashboardScreen(
     navController: NavHostController,
     onCoachClick: (String) -> Unit,
     onLogout: () -> Unit,
+    onOpenBookings: () -> Unit = {},
+    onOpenAcademies: () -> Unit = {},
+    onOpenAcademy: (String) -> Unit = {},
     coachViewModel: CoachViewModel = hiltViewModel(),
-    sessionViewModel: SessionViewModel = hiltViewModel()
+    sessionViewModel: SessionViewModel = hiltViewModel(),
+    academyViewModel: AcademyViewModel = hiltViewModel()
 ) {
     val coachState by coachViewModel.state.collectAsState()
     val sessionState by sessionViewModel.state.collectAsState()
+    val academyState by academyViewModel.list.collectAsState()
     val navBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStack?.destination?.route
 
     LaunchedEffect(user.uid) {
         sessionViewModel.loadPlayerSessions(user.uid)
+        academyViewModel.loadList(user.uid)
     }
+    val upcoming = sessionState.upcoming
+    val pendingRequests = sessionState.academyRequests.count { it.status == "PENDING" }
 
     Scaffold(
         bottomBar = {
@@ -61,20 +70,39 @@ fun PlayerDashboardScreen(
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
             item { PlayerHeader(user = user, onLogout = onLogout) }
-            item { StatsRow(sessionState.sessions.size) }
+            item { StatsRow(upcoming.size, coachState.coaches.size, academyState.all.size) }
             item {
-                SectionHeader("Upcoming Sessions", "View All") {}
-                if (sessionState.sessions.isEmpty()) {
-                    EmptyCard("No sessions yet", "Book a session with a coach to get started")
-                } else {
-                    LazyRow(
+                SectionHeader("Upcoming Sessions", "View All", onOpenBookings)
+                when {
+                    sessionState.isLoading && !sessionState.loaded -> Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = AthlinkOrange, modifier = Modifier.size(28.dp))
+                    }
+                    upcoming.isEmpty() -> EmptyCard(
+                        "No upcoming sessions",
+                        if (pendingRequests > 0) "$pendingRequests academy request(s) waiting for a reply" else "Book a verified coach or request an academy session"
+                    )
+                    else -> LazyRow(
                         contentPadding = PaddingValues(horizontal = 20.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(sessionState.sessions.take(3)) { session ->
+                        items(upcoming.take(5), key = { it.id }) { session ->
                             Box(modifier = Modifier.width(300.dp)) { SessionCard(session) }
                         }
                     }
+                }
+            }
+            item {
+                SectionHeader(
+                    if (academyState.city != null) "Academies in ${academyState.city}" else "Academies near you",
+                    "See All", onOpenAcademies
+                )
+                val academies = academyState.results.take(5)
+                when {
+                    academyState.isLoading -> Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = AthlinkOrange, modifier = Modifier.size(28.dp))
+                    }
+                    academies.isEmpty() -> EmptyCard("No academies listed yet", academyState.error ?: "Check back soon")
+                    else -> Column { academies.forEach { a -> AcademyCard(a, onClick = { onOpenAcademy(a.organisationId) }) } }
                 }
             }
             item {
@@ -88,6 +116,14 @@ fun PlayerDashboardScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     val recommended = coachViewModel.getRecommendedCoaches()
+                    if (recommended.isEmpty() && !coachState.isLoading) {
+                        item {
+                            Text(
+                                coachState.error ?: "No verified coaches yet. Academies above are already listed.",
+                                fontSize = 13.sp, color = AthlinkMedGray, modifier = Modifier.width(300.dp)
+                            )
+                        }
+                    }
                     items(recommended) { coach ->
                         CoachCardCompact(coach = coach, onClick = { onCoachClick(coach.uid) })
                     }
@@ -100,7 +136,7 @@ fun PlayerDashboardScreen(
                     contentPadding = PaddingValues(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(DummyData.sports) { sport ->
+                    items(Sports.ALL.take(10)) { sport ->
                         SportChipItem(sport = sport, onClick = {
                             navController.navigate("player_search")
                         })
@@ -121,7 +157,11 @@ private fun PlayerHeader(user: User, onLogout: () -> Unit) {
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
-                Text("Good Morning 👋", color = AthlinkMedGray, fontSize = 13.sp)
+                val hour = remember { java.time.LocalTime.now().hour }
+                Text(
+                    when (hour) { in 5..11 -> "Good morning 👋"; in 12..16 -> "Good afternoon 👋"; else -> "Good evening 👋" },
+                    color = AthlinkMedGray, fontSize = 13.sp
+                )
                 Text(user.name.ifEmpty { "Athlete" }, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -142,14 +182,14 @@ private fun PlayerHeader(user: User, onLogout: () -> Unit) {
 }
 
 @Composable
-private fun StatsRow(sessionCount: Int) {
+private fun StatsRow(upcomingCount: Int, coachCount: Int, academyCount: Int) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        StatCard("Sessions", sessionCount.toString(), Icons.Default.FitnessCenter, Modifier.weight(1f))
-        StatCard("Coaches", "5", Icons.Default.People, Modifier.weight(1f))
-        StatCard("Events", "2", Icons.Default.EmojiEvents, Modifier.weight(1f))
+        StatCard("Upcoming", upcomingCount.toString(), Icons.Default.FitnessCenter, Modifier.weight(1f))
+        StatCard("Coaches", coachCount.toString(), Icons.Default.People, Modifier.weight(1f))
+        StatCard("Academies", academyCount.toString(), Icons.Default.School, Modifier.weight(1f))
     }
 }
 

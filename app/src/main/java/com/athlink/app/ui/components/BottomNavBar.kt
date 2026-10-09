@@ -16,6 +16,7 @@ data class BottomNavItem(val label: String, val selectedIcon: ImageVector, val u
 val playerNavItems = listOf(
     BottomNavItem("Home",    Icons.Filled.Home,    Icons.Outlined.Home,    "player_home"),
     BottomNavItem("Search",  Icons.Filled.Search,  Icons.Outlined.Search,  "player_search"),
+    BottomNavItem("Academies", Icons.Filled.School, Icons.Outlined.School, "player_academies"),
     BottomNavItem("Chat",    Icons.Filled.Chat,    Icons.Outlined.ChatBubbleOutline, "player_chat"),
     BottomNavItem("Profile", Icons.Filled.Person,  Icons.Outlined.Person,  "player_profile")
 )

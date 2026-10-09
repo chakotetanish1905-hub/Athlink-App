@@ -3,7 +3,6 @@ package com.athlink.app.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.athlink.app.data.model.Coach
-import com.athlink.app.data.model.DummyData
 import com.athlink.app.data.repository.CoachRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -32,14 +31,14 @@ class CoachViewModel @Inject constructor(
 
     fun loadCoaches() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(isLoading = true)
+            _state.value = _state.value.copy(isLoading = true, error = null)
             val result = coachRepository.getCoaches()
             result.onSuccess { coaches ->
                 _state.value = _state.value.copy(
                     isLoading = false, coaches = coaches, filteredCoaches = coaches
                 )
             }.onFailure { e ->
-                _state.value = _state.value.copy(isLoading = false, error = e.message)
+                _state.value = _state.value.copy(isLoading = false, error = com.athlink.app.utils.ErrorMessages.from(e, "Couldn't load coaches. Please try again."))
             }
         }
     }

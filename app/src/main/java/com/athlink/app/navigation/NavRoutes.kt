@@ -18,6 +18,9 @@ object NavRoutes {
     const val PLAYER_GATE = "player_gate"
     const val PLAYER_ONBOARDING = "player_onboarding"
     const val PLAYER_EDIT_PROFILE = "player_edit_profile"
+    const val PLAYER_ACADEMIES = "player_academies"
+    const val PLAYER_ACADEMY = "player_academy/{academyId}"
+    const val PLAYER_BOOKINGS = "player_bookings"
 
     // Coach
     const val COACH_NAV = "coach_nav"
@@ -36,8 +39,10 @@ object NavRoutes {
     const val ORG_ONBOARDING = "org_onboarding"
     const val ORG_VERIFICATION_STATUS = "org_verification_status"
     const val ORG_EDIT_DRAFT = "org_edit_draft/{draftId}"
+    const val ORG_REQUESTS = "org_requests"
 
     fun playerBook(coachId: String) = "player_book/$coachId"
+    fun playerAcademy(academyId: String) = "player_academy/$academyId"
     fun chatThread(threadId: String, receiverName: String) = "player_chat_thread/$threadId/$receiverName"
     fun orgEditDraft(draftId: String) = "org_edit_draft/$draftId"
 }

@@ -2,7 +2,12 @@ package com.athlink.app.utils
 
 import android.util.Log
 import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.storage.StorageException
 
@@ -13,6 +18,25 @@ import com.google.firebase.storage.StorageException
 object ErrorMessages {
 
     private const val TAG = "Athlink"
+
+    /**
+     * Messages for account creation and login. [forLogin] changes how "invalid credentials" is
+     * worded (wrong password vs. badly formatted email at signup).
+     */
+    fun auth(e: Throwable, fallback: String, forLogin: Boolean = false): String {
+        Log.w(TAG, "Auth failure (${if (forLogin) "login" else "signup"}): ${e.javaClass.simpleName}: ${e.message}", e)
+        return when (e) {
+            is FirebaseAuthUserCollisionException -> "An account with this email already exists."
+            is FirebaseAuthWeakPasswordException -> "That password is too weak. Use at least 6 characters."
+            is FirebaseAuthInvalidUserException ->
+                if (forLogin) "Incorrect email or password." else "This account is no longer available."
+            is FirebaseAuthInvalidCredentialsException ->
+                if (forLogin) "Incorrect email or password." else "Enter a valid email address."
+            is FirebaseTooManyRequestsException -> "Too many attempts. Please wait a moment and try again."
+            is FirebaseNetworkException -> "Please check your internet connection."
+            else -> from(e, fallback)
+        }
+    }
 
     fun from(e: Throwable, fallback: String, context: String = ""): String {
         Log.w(TAG, "Failure${if (context.isNotEmpty()) " ($context)" else ""}: ${e.javaClass.simpleName}: ${e.message}", e)

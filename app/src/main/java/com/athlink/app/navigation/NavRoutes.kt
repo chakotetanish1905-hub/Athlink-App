@@ -14,6 +14,10 @@ object NavRoutes {
     const val PLAYER_CHAT = "player_chat"
     const val PLAYER_CHAT_THREAD = "player_chat_thread/{threadId}/{receiverName}"
     const val PLAYER_PROFILE = "player_profile"
+    /** Start of the player graph: routes to onboarding (profile incomplete) or the dashboard. */
+    const val PLAYER_GATE = "player_gate"
+    const val PLAYER_ONBOARDING = "player_onboarding"
+    const val PLAYER_EDIT_PROFILE = "player_edit_profile"
 
     // Coach
     const val COACH_NAV = "coach_nav"

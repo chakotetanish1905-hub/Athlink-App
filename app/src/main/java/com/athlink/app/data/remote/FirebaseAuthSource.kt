@@ -1,11 +1,16 @@
 package com.athlink.app.data.remote
 
 import com.athlink.app.data.model.CoachRegistration
+import com.athlink.app.data.model.NotificationPreferences
+import com.athlink.app.data.model.PlayerProfileStatus
+import com.athlink.app.data.model.PlayerSignupForm
 import com.athlink.app.data.model.User
 import com.athlink.app.data.model.UserRole
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -85,6 +90,74 @@ class FirebaseAuthSource @Inject constructor(
                 throw e
             }
             Result.success(user)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Player account creation (step 1 of the player flow; onboarding follows).
+     *
+     * 1. Creates the Firebase Auth account. The password goes ONLY to Firebase Auth.
+     * 2. Writes `users/{uid}` (role PLAYER, profileStatus INCOMPLETE, consent timestamps from the
+     *    server). `players/{uid}` is written later, by onboarding.
+     * 3. If that write fails, the just-created Auth account is deleted again (same as coach and
+     *    organisation signup), so the user is never left with a login that has no account record
+     *    and can simply retry. Once `users/{uid}` exists, an unfinished profile is always resumable:
+     *    the player graph routes INCOMPLETE players back into onboarding on every login.
+     *
+     * The form must already have passed [PlayerSignupForm.validate].
+     */
+    suspend fun signUpPlayer(form: PlayerSignupForm): Result<User> {
+        return try {
+            val result = auth.createUserWithEmailAndPassword(form.normalisedEmail, form.password).await()
+            val firebaseUser = result.user ?: throw Exception("UID null")
+            val uid = firebaseUser.uid
+            val now = System.currentTimeMillis()
+            val defaults = NotificationPreferences()
+            val fields = mapOf(
+                "uid" to uid,
+                "name" to form.normalisedName,
+                "email" to form.normalisedEmail,
+                "role" to UserRole.PLAYER.name,
+                "profileImageUrl" to "",
+                "organisationId" to "",
+                "createdAt" to now,
+                "dateOfBirth" to "",
+                "phoneNumber" to "",
+                "gender" to "",
+                "profileStatus" to PlayerProfileStatus.INCOMPLETE.name,
+                "notificationPreferences" to mapOf(
+                    "eventNotifications" to defaults.eventNotifications,
+                    "coachingNotifications" to defaults.coachingNotifications,
+                    "chatNotifications" to defaults.chatNotifications,
+                    "contentNotifications" to defaults.contentNotifications
+                ),
+                "termsAcceptedAt" to FieldValue.serverTimestamp(),
+                "privacyAcceptedAt" to FieldValue.serverTimestamp(),
+                "termsVersion" to PlayerSignupForm.TERMS_VERSION,
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+            try {
+                firestore.collection(FirestorePaths.USERS).document(uid).set(fields).await()
+            } catch (e: Exception) {
+                runCatching { firebaseUser.delete().await() }
+                throw e
+            }
+            val acceptedAt = Date(now)
+            Result.success(
+                User(
+                    uid = uid,
+                    name = form.normalisedName,
+                    email = form.normalisedEmail,
+                    role = UserRole.PLAYER,
+                    createdAt = now,
+                    profileStatus = PlayerProfileStatus.INCOMPLETE.name,
+                    termsAcceptedAt = acceptedAt,
+                    privacyAcceptedAt = acceptedAt,
+                    termsVersion = PlayerSignupForm.TERMS_VERSION
+                )
+            )
         } catch (e: Exception) {
             Result.failure(e)
         }

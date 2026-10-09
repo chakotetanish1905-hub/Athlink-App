@@ -27,9 +27,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.athlink.app.data.model.CoachField
 import com.athlink.app.data.model.CoachRegistration
 import com.athlink.app.data.model.CoachingLevel
+import com.athlink.app.data.model.PlayerSignupField
+import com.athlink.app.data.model.PlayerSignupForm
 import com.athlink.app.data.model.Sports
 import com.athlink.app.data.model.UserRole
 import com.athlink.app.ui.components.AppTextField
+import com.athlink.app.ui.components.ConsentRow
 import com.athlink.app.ui.components.PrimaryButton
 import com.athlink.app.ui.theme.*
 import com.athlink.app.viewmodel.AuthViewModel
@@ -54,8 +57,26 @@ fun SignupScreen(
     var coachForm by remember { mutableStateOf(CoachRegistration()) }
     val isCoach = selectedRole == UserRole.COACH
     val isOrganisation = selectedRole == UserRole.ORGANISATION
+    val isPlayer = selectedRole == UserRole.PLAYER
     val fieldErrors = if (isCoach) state.coachFieldErrors else emptyMap()
-    fun clear(field: CoachField) = viewModel.clearCoachFieldError(field)
+    // Player-only consent (Terms + Privacy). Coach / organisation flows are unchanged.
+    var termsAccepted by remember { mutableStateOf(false) }
+    var privacyAccepted by remember { mutableStateOf(false) }
+    val playerErrors = if (isPlayer) state.playerFieldErrors else emptyMap()
+    fun clear(field: CoachField) {
+        viewModel.clearCoachFieldError(field)
+        when (field) {
+            CoachField.NAME -> viewModel.clearPlayerFieldError(PlayerSignupField.NAME)
+            CoachField.EMAIL -> viewModel.clearPlayerFieldError(PlayerSignupField.EMAIL)
+            CoachField.PASSWORD -> viewModel.clearPlayerFieldError(PlayerSignupField.PASSWORD)
+            CoachField.CONFIRM_PASSWORD -> viewModel.clearPlayerFieldError(PlayerSignupField.CONFIRM_PASSWORD)
+            else -> Unit
+        }
+    }
+    val nameError = fieldErrors[CoachField.NAME] ?: playerErrors[PlayerSignupField.NAME]
+    val emailError = fieldErrors[CoachField.EMAIL] ?: playerErrors[PlayerSignupField.EMAIL]
+    val passwordError = fieldErrors[CoachField.PASSWORD] ?: playerErrors[PlayerSignupField.PASSWORD]
+    val confirmError = fieldErrors[CoachField.CONFIRM_PASSWORD] ?: playerErrors[PlayerSignupField.CONFIRM_PASSWORD]
 
     LaunchedEffect(state.isLoggedIn) {
         if (state.isLoggedIn) onSignupSuccess()
@@ -98,18 +119,18 @@ fun SignupScreen(
 
                     AppTextField(name, { name = it; clear(CoachField.NAME) }, if (isOrganisation) "Organisation Name" else "Full Name",
                         leadingIcon = if (isOrganisation) Icons.Default.Business else Icons.Default.Person,
-                        isError = CoachField.NAME in fieldErrors, errorMessage = fieldErrors[CoachField.NAME].orEmpty(),
+                        isError = nameError != null, errorMessage = nameError.orEmpty(),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next))
                     Spacer(Modifier.height(14.dp))
 
                     AppTextField(email, { email = it; clear(CoachField.EMAIL) }, "Email Address", leadingIcon = Icons.Default.Email,
-                        isError = CoachField.EMAIL in fieldErrors, errorMessage = fieldErrors[CoachField.EMAIL].orEmpty(),
+                        isError = emailError != null, errorMessage = emailError.orEmpty(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next))
                     Spacer(Modifier.height(14.dp))
 
                     AppTextField(
                         password, { password = it; clear(CoachField.PASSWORD) }, "Password", leadingIcon = Icons.Default.Lock,
-                        isError = CoachField.PASSWORD in fieldErrors, errorMessage = fieldErrors[CoachField.PASSWORD].orEmpty(),
+                        isError = passwordError != null, errorMessage = passwordError.orEmpty(),
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
                         trailingIcon = {
@@ -124,8 +145,8 @@ fun SignupScreen(
                         confirmPassword, { confirmPassword = it; clear(CoachField.CONFIRM_PASSWORD) }, "Confirm Password", leadingIcon = Icons.Default.Lock,
                         visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                        isError = (confirmPassword.isNotEmpty() && password != confirmPassword) || CoachField.CONFIRM_PASSWORD in fieldErrors,
-                        errorMessage = "Passwords do not match",
+                        isError = (confirmPassword.isNotEmpty() && password != confirmPassword) || confirmError != null,
+                        errorMessage = confirmError ?: "Passwords do not match",
                         trailingIcon = {
                             IconButton({ confirmPasswordVisible = !confirmPasswordVisible }) {
                                 Icon(if (confirmPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -142,6 +163,32 @@ fun SignupScreen(
                         RoleChip(Icons.Default.DirectionsRun, "Player", selectedRole == UserRole.PLAYER) { selectedRole = UserRole.PLAYER; viewModel.clearError() }
                         RoleChip(Icons.Default.EmojiPeople, "Coach", selectedRole == UserRole.COACH) { selectedRole = UserRole.COACH; viewModel.clearError() }
                         RoleChip(Icons.Default.Business, "Organisation", selectedRole == UserRole.ORGANISATION) { selectedRole = UserRole.ORGANISATION; viewModel.clearError() }
+                    }
+
+                    if (isPlayer) {
+                        Spacer(Modifier.height(16.dp))
+                        Card(colors = CardDefaults.cardColors(containerColor = AthlinkBlueLight.copy(0.12f)), shape = RoundedCornerShape(12.dp)) {
+                            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+                                Icon(Icons.Default.SportsSoccer, null, tint = AthlinkBlueLight, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Next, a few quick questions about you and your sport (about 2 minutes), " +
+                                        "so we can suggest the right coaches and events.",
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        ConsentRow(
+                            checked = termsAccepted, text = "I agree to the Athlink Terms of Service",
+                            error = playerErrors[PlayerSignupField.TERMS],
+                            onChange = { termsAccepted = it; viewModel.clearPlayerFieldError(PlayerSignupField.TERMS) }
+                        )
+                        ConsentRow(
+                            checked = privacyAccepted, text = "I have read the Athlink Privacy Policy",
+                            error = playerErrors[PlayerSignupField.PRIVACY],
+                            onChange = { privacyAccepted = it; viewModel.clearPlayerFieldError(PlayerSignupField.PRIVACY) }
+                        )
                     }
 
                     if (isOrganisation) {
@@ -197,13 +244,15 @@ fun SignupScreen(
                             } else if (isOrganisation) {
                                 viewModel.registerOrganisation(name, email, password)
                             } else {
-                                viewModel.register(name, email, password, selectedRole)
+                                viewModel.registerPlayer(
+                                    PlayerSignupForm(name, email, password, confirmPassword, termsAccepted, privacyAccepted)
+                                )
                             }
                         },
                         enabled = isValid,
                         isLoading = state.isLoading
                     )
-                    if (isCoach && fieldErrors.isNotEmpty()) {
+                    if ((isCoach && fieldErrors.isNotEmpty()) || playerErrors.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         Text("Please fix the highlighted fields above.", color = AthlinkRed, fontSize = 12.sp)
                     }

@@ -1,6 +1,7 @@
 package com.athlink.app.data.repository
 
 import com.athlink.app.data.model.CoachRegistration
+import com.athlink.app.data.model.PlayerSignupForm
 import com.athlink.app.data.model.User
 import com.athlink.app.data.model.UserRole
 import com.athlink.app.data.remote.FirebaseAuthSource
@@ -21,6 +22,9 @@ class AuthRepository @Inject constructor(
 
     suspend fun registerCoach(registration: CoachRegistration): Result<User> =
         authSource.signUpCoach(registration)
+
+    /** Player account creation (Auth + private `users/{uid}`); the profile is completed in onboarding. */
+    suspend fun registerPlayer(form: PlayerSignupForm): Result<User> = authSource.signUpPlayer(form)
 
     suspend fun registerOrganisation(name: String, email: String, password: String): Result<User> =
         authSource.signUpOrganisation(name, email, password)

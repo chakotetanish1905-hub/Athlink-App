@@ -5,7 +5,10 @@ package com.athlink.app.data.remote
  * `firestore.rules` / `storage.rules`. See ATHLINK_COACH_FIREBASE_SCHEMA.md for visibility.
  */
 object FirestorePaths {
-    const val USERS = "users"
+    const val USERS = "users"                 // private account record (owner + admin)
+
+    // ── Player ──────────────────────────────────────────────────────────
+    const val PLAYERS = "players"             // players/{uid}: public player profile (signed-in read)
 
     // ── Coach: public profile + public subcollections ───────────────────
     const val COACHES = "coaches"

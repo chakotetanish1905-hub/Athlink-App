@@ -55,6 +55,35 @@ function verificationRecord(id, overrides = {}) {
     reviewedAt: null, reviewedBy: null, reviewNotes: null, rejectionReason: null, updatedAt: Timestamp.now(), ...overrides,
   };
 }
+// Shape written by FirebaseAuthSource.signUpPlayer.
+function playerUser(id, overrides = {}) {
+  return {
+    uid: id, name: 'Asha Patel', email: `${id}@x.org`, role: 'PLAYER', profileImageUrl: '', organisationId: '',
+    createdAt: Date.now(), dateOfBirth: '', phoneNumber: '', gender: '', profileStatus: 'INCOMPLETE',
+    notificationPreferences: { eventNotifications: true, coachingNotifications: true, chatNotifications: true, contentNotifications: false },
+    termsAcceptedAt: serverTimestamp(), privacyAcceptedAt: serverTimestamp(), termsVersion: '2026-10', updatedAt: serverTimestamp(),
+    ...overrides,
+  };
+}
+// Shape written by PlayerProfileForm.toPlayerFields (+ timestamps).
+function playerPublic(id, overrides = {}) {
+  return {
+    uid: id, displayName: 'Asha Patel', photoUrl: '', country: 'India', state: 'Gujarat', city: 'Surat', region: 'West India',
+    areaType: 'TIER_2', primarySport: 'Cricket', secondarySports: ['Football'], sportProfile: { playerRole: 'Bowler' },
+    skillLevel: 'INTERMEDIATE', goals: ['FIND_COACH'], coachingPreferences: { format: 'GROUP', trainingTime: 'EVENING', maxDistanceKm: 10 },
+    yearsOfExperience: 3, currentTeam: '', academy: '', achievements: [], bio: '', ranking: '',
+    createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...overrides,
+  };
+}
+async function seedPlayer(id, userOverrides = {}, withProfile = false) {
+  await seed(async (f) => {
+    await setDoc(doc(f, 'users', id), playerUser(id, {
+      termsAcceptedAt: Timestamp.now(), privacyAcceptedAt: Timestamp.now(), updatedAt: Timestamp.now(), ...userOverrides,
+    }));
+    if (withProfile) await setDoc(doc(f, 'players', id), playerPublic(id, { createdAt: Timestamp.now(), updatedAt: Timestamp.now() }));
+  });
+}
+
 async function seed(fn) { await env.withSecurityRulesDisabled(async (c) => fn(c.firestore(), c.storage())); }
 async function seedOrg(id, orgOverrides = {}, verificationOverrides = {}) {
   await seed(async (f) => {
@@ -73,8 +102,8 @@ function event(id, orgId, overrides = {}) {
 const verified = { verificationStatus: 'VERIFIED', verificationLevel: 'LEVEL_2_ORGANISATION_VERIFIED' };
 
 // ── TEST 1-3: signups ──────────────────────────────────────────────────────
-test('TEST 1: player signup writes its own users doc', async () => {
-  await assertSucceeds(setDoc(doc(db(PLAYER), 'users', PLAYER), { uid: PLAYER, name: 'P', email: 'p@x.org', role: 'PLAYER', organisationId: '' }));
+test('TEST 1: player signup writes its own users doc (with server-time consent)', async () => {
+  await assertSucceeds(setDoc(doc(db(PLAYER), 'users', PLAYER), playerUser(PLAYER)));
 });
 
 test('TEST 2: coach signup batch (users + coaches + coachPrivate) still works', async () => {
@@ -422,4 +451,130 @@ test('coaches cannot raise their own rating or verification', async () => {
   await assertFails(updateDoc(doc(f, 'coaches', 'coach1'), { verificationStatus: 'VERIFIED' }));
   await assertSucceeds(updateDoc(doc(f, 'coaches', 'coach1'), { bio: 'New bio' }));
   await assertSucceeds(getDocs(collection(db(PLAYER), 'coaches')));
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PLAYER signup + onboarding (players/{uid} public, users/{uid} private)
+// ═════════════════════════════════════════════════════════════════════════════
+const PLAYER2 = 'player2';
+
+test('PLAYER: signup without Terms/Privacy consent is rejected', async () => {
+  await assertFails(setDoc(doc(db(PLAYER), 'users', PLAYER), playerUser(PLAYER, { termsAcceptedAt: null })));
+  await assertFails(setDoc(doc(db(PLAYER), 'users', PLAYER), playerUser(PLAYER, { privacyAcceptedAt: null })));
+});
+
+test('PLAYER: signup cannot start as COMPLETE or store a password', async () => {
+  await assertFails(setDoc(doc(db(PLAYER), 'users', PLAYER), playerUser(PLAYER, { profileStatus: 'COMPLETE' })));
+  await assertFails(setDoc(doc(db(PLAYER), 'users', PLAYER), playerUser(PLAYER, { password: 'secret123' })));
+});
+
+test('PLAYER: onboarding progress creates players/{uid} and updates users/{uid} in one batch', async () => {
+  await seedPlayer(PLAYER);
+  const f = db(PLAYER);
+  const b = writeBatch(f);
+  b.set(doc(f, 'players', PLAYER), playerPublic(PLAYER));
+  b.update(doc(f, 'users', PLAYER), { name: 'Asha Patel', dateOfBirth: '2008-03-12', profileStatus: 'INCOMPLETE', updatedAt: serverTimestamp() });
+  await assertSucceeds(b.commit());
+});
+
+test('PLAYER: completing the profile succeeds only together with players/{uid}', async () => {
+  await seedPlayer(PLAYER, { dateOfBirth: '2008-03-12' });
+  // status COMPLETE without the public profile: rejected
+  await assertFails(updateDoc(doc(db(PLAYER), 'users', PLAYER), { profileStatus: 'COMPLETE', updatedAt: serverTimestamp() }));
+  const f = db(PLAYER);
+  const b = writeBatch(f);
+  b.set(doc(f, 'players', PLAYER), playerPublic(PLAYER));
+  b.update(doc(f, 'users', PLAYER), { profileStatus: 'COMPLETE', updatedAt: serverTimestamp() });
+  await assertSucceeds(b.commit());
+});
+
+test('PLAYER: a legacy player without consent cannot complete until consent is stamped', async () => {
+  await seedPlayer(PLAYER, { termsAcceptedAt: null, privacyAcceptedAt: null, profileStatus: '' });
+  const f = db(PLAYER);
+  const noConsent = writeBatch(f);
+  noConsent.set(doc(f, 'players', PLAYER), playerPublic(PLAYER));
+  noConsent.update(doc(f, 'users', PLAYER), { profileStatus: 'COMPLETE', updatedAt: serverTimestamp() });
+  await assertFails(noConsent.commit());
+  const withConsent = writeBatch(f);
+  withConsent.set(doc(f, 'players', PLAYER), playerPublic(PLAYER));
+  withConsent.update(doc(f, 'users', PLAYER), {
+    profileStatus: 'COMPLETE', termsAcceptedAt: serverTimestamp(), privacyAcceptedAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  });
+  await assertSucceeds(withConsent.commit());
+});
+
+test('PLAYER: consent timestamps cannot be rewritten once set', async () => {
+  await seedPlayer(PLAYER);
+  await assertFails(updateDoc(doc(db(PLAYER), 'users', PLAYER), { termsAcceptedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(PLAYER), 'users', PLAYER), { privacyAcceptedAt: null }));
+});
+
+test('PLAYER: date of birth is locked once the profile is COMPLETE', async () => {
+  await seedPlayer(PLAYER, { dateOfBirth: '2010-01-01', profileStatus: 'INCOMPLETE' });
+  await assertSucceeds(updateDoc(doc(db(PLAYER), 'users', PLAYER), { dateOfBirth: '2009-01-01' }));
+  await seedPlayer(PLAYER2, { dateOfBirth: '2010-01-01', profileStatus: 'COMPLETE' }, true);
+  await assertFails(updateDoc(doc(db(PLAYER2), 'users', PLAYER2), { dateOfBirth: '1990-01-01' }));
+  await assertSucceeds(updateDoc(doc(db(PLAYER2), 'users', PLAYER2), { phoneNumber: '9876543210' }));
+});
+
+test('PLAYER: invalid private values are rejected (bad DOB format, unknown status)', async () => {
+  await seedPlayer(PLAYER);
+  await assertFails(updateDoc(doc(db(PLAYER), 'users', PLAYER), { dateOfBirth: '12/03/2008' }));
+  await assertFails(updateDoc(doc(db(PLAYER), 'users', PLAYER), { profileStatus: 'VERIFIED' }));
+});
+
+test('PLAYER: cannot change own role, nor another user\'s role', async () => {
+  await seedPlayer(PLAYER);
+  await seedPlayer(PLAYER2);
+  await assertFails(updateDoc(doc(db(PLAYER), 'users', PLAYER), { role: 'COACH' }));
+  await assertFails(updateDoc(doc(db(PLAYER), 'users', PLAYER2), { role: 'COACH' }));
+});
+
+test('PLAYER: cannot create or modify another player\'s profile', async () => {
+  await seedPlayer(PLAYER);
+  await seedPlayer(PLAYER2, {}, true);
+  await assertFails(setDoc(doc(db(PLAYER), 'players', PLAYER2), playerPublic(PLAYER2)));
+  await assertFails(updateDoc(doc(db(PLAYER), 'players', PLAYER2), { bio: 'hacked', updatedAt: serverTimestamp() }));
+  await assertFails(setDoc(doc(db(PLAYER), 'players', PLAYER), playerPublic(PLAYER2))); // uid mismatch
+});
+
+test('PLAYER: private data (DOB, email, phone) can never be written to the public profile', async () => {
+  await seedPlayer(PLAYER);
+  await assertFails(setDoc(doc(db(PLAYER), 'players', PLAYER), playerPublic(PLAYER, { dateOfBirth: '2008-03-12' })));
+  await assertFails(setDoc(doc(db(PLAYER), 'players', PLAYER), playerPublic(PLAYER, { email: 'p@x.org' })));
+  await assertFails(setDoc(doc(db(PLAYER), 'players', PLAYER), playerPublic(PLAYER, { phoneNumber: '9876543210' })));
+});
+
+test('PLAYER: public profile values are bounded (skill level enum, sizes)', async () => {
+  await seedPlayer(PLAYER);
+  await assertFails(setDoc(doc(db(PLAYER), 'players', PLAYER), playerPublic(PLAYER, { skillLevel: 'GOAT' })));
+  await assertFails(setDoc(doc(db(PLAYER), 'players', PLAYER), playerPublic(PLAYER, { bio: 'x'.repeat(501) })));
+  await assertFails(setDoc(doc(db(PLAYER), 'players', PLAYER), playerPublic(PLAYER, { secondarySports: ['a', 'b', 'c', 'd', 'e', 'f'] })));
+});
+
+test('PLAYER: uid and createdAt of the public profile are immutable', async () => {
+  await seedPlayer(PLAYER, {}, true);
+  await assertFails(updateDoc(doc(db(PLAYER), 'players', PLAYER), { uid: PLAYER2, updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(db(PLAYER), 'players', PLAYER), { createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+  await assertSucceeds(updateDoc(doc(db(PLAYER), 'players', PLAYER), { bio: 'Left-arm spinner', updatedAt: serverTimestamp() }));
+});
+
+test('PLAYER: coaches and organisations cannot create a player profile', async () => {
+  await seed(async (f) => setDoc(doc(f, 'users', 'coach1'), { uid: 'coach1', role: 'COACH' }));
+  await assertFails(setDoc(doc(db('coach1'), 'players', 'coach1'), playerPublic('coach1')));
+});
+
+test('PLAYER: profiles are readable by signed-in users only; private users docs stay private', async () => {
+  await seedPlayer(PLAYER, { dateOfBirth: '2010-05-05' }, true);
+  await seed(async (f) => setDoc(doc(f, 'users', 'coach1'), { uid: 'coach1', role: 'COACH' }));
+  await assertSucceeds(getDoc(doc(db('coach1'), 'players', PLAYER)));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'players', PLAYER)));
+  await assertFails(getDoc(doc(db('coach1'), 'users', PLAYER))); // DOB / email / phone are never readable by others
+  await assertSucceeds(getDoc(doc(db(PLAYER), 'users', PLAYER)));
+});
+
+test('PLAYER: coach and organisation signups are unaffected by player consent rules', async () => {
+  const coachUser = { uid: 'coach9', name: 'C', email: 'c@x.org', role: 'COACH', organisationId: '', profileStatus: '',
+    dateOfBirth: '', phoneNumber: '', gender: '', termsAcceptedAt: null, privacyAcceptedAt: null, notificationPreferences: {} };
+  await assertSucceeds(setDoc(doc(db('coach9'), 'users', 'coach9'), coachUser));
 });

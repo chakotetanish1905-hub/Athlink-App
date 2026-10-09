@@ -4,9 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.athlink.app.data.model.CoachField
 import com.athlink.app.data.model.CoachRegistration
+import com.athlink.app.data.model.PlayerSignupField
+import com.athlink.app.data.model.PlayerSignupForm
 import com.athlink.app.data.model.User
 import com.athlink.app.data.model.UserRole
 import com.athlink.app.data.repository.AuthRepository
+import com.athlink.app.utils.ErrorMessages
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
@@ -24,7 +27,11 @@ data class AuthState(
     val error: String? = null,
     val isLoggedIn: Boolean = false,
     /** Per-field validation errors for the coach registration form. */
-    val coachFieldErrors: Map<CoachField, String> = emptyMap()
+    val coachFieldErrors: Map<CoachField, String> = emptyMap(),
+    /** Per-field validation errors for the player account form. */
+    val playerFieldErrors: Map<PlayerSignupField, String> = emptyMap(),
+    /** True until the stored session (if any) has been resolved at app start. */
+    val isCheckingSession: Boolean = false
 )
 
 @HiltViewModel
@@ -41,8 +48,8 @@ class AuthViewModel @Inject constructor(
 
     private fun checkAuthState() {
         if (authRepository.isLoggedIn) {
+            _state.value = _state.value.copy(isLoading = true, isCheckingSession = true)
             viewModelScope.launch {
-                _state.value = _state.value.copy(isLoading = true)
                 val result = authRepository.getCurrentUser()
                 result.onSuccess { user ->
                     _state.value = AuthState(user = user, isLoggedIn = true)
@@ -54,17 +61,64 @@ class AuthViewModel @Inject constructor(
     }
 
     fun login(email: String, password: String) {
+        if (_state.value.isLoading) return
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
-            val result = authRepository.login(email, password)
+            val result = authRepository.login(email.trim(), password)
             result.onSuccess { user ->
                 _state.value = AuthState(user = user, isLoggedIn = true)
             }.onFailure { e ->
-                _state.value = AuthState(error = e.message ?: "Login failed")
+                _state.value = AuthState(error = ErrorMessages.auth(e, "Login failed. Please try again.", forLogin = true))
             }
         }
     }
 
+    /**
+     * Player account creation (step 1). Validates centrally, then creates the Auth account and the
+     * private `users/{uid}` record (role PLAYER, profile INCOMPLETE). Navigation then sends the
+     * player into onboarding. Returns false (and fills [AuthState.playerFieldErrors]) when invalid.
+     * Ignored while a request is already running, so a double tap can't create two attempts.
+     */
+    fun registerPlayer(form: PlayerSignupForm): Boolean {
+        if (_state.value.isLoading) return false
+        val errors = form.validate()
+        if (errors.isNotEmpty()) {
+            _state.value = _state.value.copy(playerFieldErrors = errors, error = null)
+            return false
+        }
+        _state.value = _state.value.copy(isLoading = true, error = null, playerFieldErrors = emptyMap())
+        viewModelScope.launch {
+            authRepository.registerPlayer(form)
+                .onSuccess { user -> _state.value = AuthState(user = user, isLoggedIn = true) }
+                .onFailure { e ->
+                    val fieldErrors = when (e) {
+                        is FirebaseAuthUserCollisionException -> mapOf(PlayerSignupField.EMAIL to "An account with this email already exists.")
+                        is FirebaseAuthWeakPasswordException -> mapOf(PlayerSignupField.PASSWORD to "That password is too weak. Use at least 6 characters.")
+                        is FirebaseAuthInvalidCredentialsException -> mapOf(PlayerSignupField.EMAIL to "Enter a valid email address.")
+                        else -> emptyMap()
+                    }
+                    _state.value = AuthState(
+                        error = if (fieldErrors.isEmpty()) ErrorMessages.auth(e, "We couldn't create your account. Please try again.") else null,
+                        playerFieldErrors = fieldErrors
+                    )
+                }
+        }
+        return true
+    }
+
+    /** Clears the error shown under a player signup field once the user edits it. */
+    fun clearPlayerFieldError(field: PlayerSignupField) {
+        val current = _state.value.playerFieldErrors
+        if (field in current) _state.value = _state.value.copy(playerFieldErrors = current - field)
+    }
+
+    /** Replaces the signed-in user after their profile changed (e.g. onboarding completed). */
+    fun onUserUpdated(user: User) {
+        val current = _state.value.user ?: return
+        if (current.uid == user.uid) _state.value = _state.value.copy(user = user)
+    }
+
+    @Deprecated("Players use registerPlayer (consent + onboarding); coaches and organisations have their own flows.")
     fun register(name: String, email: String, password: String, role: UserRole) {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
@@ -146,6 +200,6 @@ class AuthViewModel @Inject constructor(
     }
 
     fun clearError() {
-        _state.value = _state.value.copy(error = null, coachFieldErrors = emptyMap())
+        _state.value = _state.value.copy(error = null, coachFieldErrors = emptyMap(), playerFieldErrors = emptyMap())
     }
 }

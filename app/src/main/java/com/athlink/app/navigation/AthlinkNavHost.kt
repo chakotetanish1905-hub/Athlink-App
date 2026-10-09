@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.athlink.app.data.model.OrganisationLanding
+import com.athlink.app.data.model.PlayerLanding
 import com.athlink.app.data.model.UserRole
 import com.athlink.app.ui.screens.auth.LoginScreen
 import com.athlink.app.ui.screens.auth.SignupScreen
@@ -35,20 +36,23 @@ fun AthlinkNavHost() {
 
         // ── Splash ────────────────────────────────────────────────────────────
         composable(NavRoutes.SPLASH) {
-            SplashScreen(
-                onFinished = {
-                    val dest = if (authState.isLoggedIn) {
-                        when (authState.user?.role) {
-                            UserRole.COACH -> NavRoutes.COACH_NAV
-                            UserRole.ORGANISATION -> NavRoutes.ORG_NAV
-                            else -> NavRoutes.PLAYER_NAV
-                        }
-                    } else NavRoutes.LOGIN
-                    rootNavController.navigate(dest) {
-                        popUpTo(NavRoutes.SPLASH) { inclusive = true }
+            // Wait for BOTH the splash animation and the stored-session check, so a signed-in user
+            // on a slow network isn't sent to Login (or into a role graph with no user yet).
+            var splashDone by remember { mutableStateOf(false) }
+            SplashScreen(onFinished = { splashDone = true })
+            LaunchedEffect(splashDone, authState.isCheckingSession, authState.isLoggedIn) {
+                if (!splashDone || authState.isCheckingSession) return@LaunchedEffect
+                val dest = if (authState.isLoggedIn) {
+                    when (authState.user?.role) {
+                        UserRole.COACH -> NavRoutes.COACH_NAV
+                        UserRole.ORGANISATION -> NavRoutes.ORG_NAV
+                        else -> NavRoutes.PLAYER_NAV
                     }
+                } else NavRoutes.LOGIN
+                rootNavController.navigate(dest) {
+                    popUpTo(NavRoutes.SPLASH) { inclusive = true }
                 }
-            )
+            }
         }
 
         // ── Auth ──────────────────────────────────────────────────────────────
@@ -83,11 +87,54 @@ fun AthlinkNavHost() {
         }
 
         // ── Player Nav Graph ──────────────────────────────────────────────────
+        // Every player enters through PLAYER_GATE, which sends players whose profile is not COMPLETE
+        // (new signups, players who left onboarding midway, accounts from before onboarding) into
+        // onboarding, and everyone else to the dashboard.
         composable(NavRoutes.PLAYER_NAV) {
             val playerNavController = rememberNavController()
             val user = authState.user ?: return@composable
+            val playerLogout: () -> Unit = {
+                authViewModel.logout()
+                rootNavController.navigate(NavRoutes.LOGIN) { popUpTo(0) { inclusive = true } }
+            }
 
-            NavHost(navController = playerNavController, startDestination = NavRoutes.PLAYER_HOME) {
+            NavHost(navController = playerNavController, startDestination = NavRoutes.PLAYER_GATE) {
+
+                composable(NavRoutes.PLAYER_GATE) {
+                    PlayerGateScreen(
+                        user = user,
+                        onRoute = { landing, freshUser ->
+                            freshUser?.let { authViewModel.onUserUpdated(it) }
+                            val dest = if (landing == PlayerLanding.DASHBOARD) NavRoutes.PLAYER_HOME else NavRoutes.PLAYER_ONBOARDING
+                            playerNavController.navigate(dest) { popUpTo(NavRoutes.PLAYER_GATE) { inclusive = true } }
+                        },
+                        onLogout = playerLogout
+                    )
+                }
+
+                composable(NavRoutes.PLAYER_ONBOARDING) {
+                    PlayerOnboardingScreen(
+                        user = user,
+                        onCompleted = { updated ->
+                            authViewModel.onUserUpdated(updated)
+                            playerNavController.navigate(NavRoutes.PLAYER_HOME) {
+                                popUpTo(NavRoutes.PLAYER_ONBOARDING) { inclusive = true }
+                            }
+                        },
+                        onLogout = playerLogout
+                    )
+                }
+
+                composable(NavRoutes.PLAYER_EDIT_PROFILE) {
+                    PlayerEditProfileScreen(
+                        user = user,
+                        onSaved = { updated ->
+                            authViewModel.onUserUpdated(updated)
+                            playerNavController.popBackStack()
+                        },
+                        onBack = { playerNavController.popBackStack() }
+                    )
+                }
 
                 composable(NavRoutes.PLAYER_HOME) {
                     PlayerDashboardScreen(
@@ -155,11 +202,9 @@ fun AthlinkNavHost() {
                 composable(NavRoutes.PLAYER_PROFILE) {
                     PlayerProfileScreen(
                         user = user,
-                        onLogout = {
-                            authViewModel.logout()
-                            rootNavController.navigate(NavRoutes.LOGIN) { popUpTo(0) { inclusive = true } }
-                        },
-                        onBack = { playerNavController.navigate(NavRoutes.PLAYER_HOME) { launchSingleTop = true } }
+                        onLogout = playerLogout,
+                        onBack = { playerNavController.navigate(NavRoutes.PLAYER_HOME) { launchSingleTop = true } },
+                        onEditProfile = { playerNavController.navigate(NavRoutes.PLAYER_EDIT_PROFILE) { launchSingleTop = true } }
                     )
                 }
             }

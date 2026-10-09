@@ -12,7 +12,8 @@ rules_version = '2';
 //   UNVERIFIED -> CONTACT_VERIFIED              (needs request.auth.token.email_verified)
 //   editable   -> UNDER_REVIEW (submit)          (needs email_verified)
 //
-// Mirrors: OrganisationVerificationPolicy.kt / CoachVerificationPolicy.kt / tools/admin/policy.js.
+// Mirrors: OrganisationVerificationPolicy.kt / CoachVerificationPolicy.kt / tools/admin/policy.js,
+//          PlayerValidators.kt / PlayerProfileForm.kt (player profile limits).
 // Tests:   tests/rules/rules.test.mjs
 // ─────────────────────────────────────────────────────────────────────────────
 service cloud.firestore {
@@ -74,19 +75,102 @@ service cloud.firestore {
     // ═════════════════════════════════════════════════════════════════════════
     // users/{uid}: shared account record. Role is fixed at signup.
     // ═════════════════════════════════════════════════════════════════════════
+    // Private account fields (date of birth, phone, gender, consents, notification preferences) live
+    // here because this document is owner-only. A password is never stored in Firestore.
+    function validUserData(d) {
+      return !d.keys().hasAny(['password', 'confirmPassword'])
+        && d.get('dateOfBirth', '') is string
+        && (d.get('dateOfBirth', '') == '' || d.get('dateOfBirth', '').matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'))
+        && d.get('phoneNumber', '') is string && d.get('phoneNumber', '').size() <= 20
+        && d.get('gender', '') in ['', 'MALE', 'FEMALE', 'NON_BINARY', 'PREFER_NOT_TO_SAY']
+        && d.get('profileStatus', '') in ['', 'INCOMPLETE', 'COMPLETE']
+        && d.get('notificationPreferences', {}) is map;
+    }
+    // Consent timestamps can only be stamped once, with the server time.
+    function consentStampOk(key) {
+      return unchanged([key])
+        || (existing().get(key, null) == null && incoming().get(key, null) == request.time);
+    }
+    // A PLAYER profile can only be COMPLETE together with its public players/{uid} document and
+    // recorded consent (the app writes all of it in one batch).
+    function playerCompleteOk(uid, d) {
+      return d.role != 'PLAYER'
+        || d.get('profileStatus', '') != 'COMPLETE'
+        || (existsAfter(path('players', uid))
+            && d.get('termsAcceptedAt', null) != null
+            && d.get('privacyAcceptedAt', null) != null);
+    }
+
     match /users/{uid} {
       allow read: if isSelf(uid);
       allow create: if isSelf(uid)
         && incoming().uid == uid
         && incoming().role in ['PLAYER', 'COACH', 'ORGANISATION']
         && (incoming().get('organisationId', '') == ''
-            || (incoming().role == 'ORGANISATION' && incoming().organisationId == uid));
+            || (incoming().role == 'ORGANISATION' && incoming().organisationId == uid))
+        && validUserData(incoming())
+        && incoming().get('profileStatus', '') != 'COMPLETE'
+        // Player signup requires Terms + Privacy consent, stamped with the server time.
+        && (incoming().role != 'PLAYER'
+            || (incoming().get('termsAcceptedAt', null) == request.time
+                && incoming().get('privacyAcceptedAt', null) == request.time));
       allow update: if isSelf(uid)
         && unchanged(['uid', 'role', 'createdAt'])
         && (unchanged(['organisationId'])
             || (existing().role == 'ORGANISATION'
                 && existing().get('organisationId', '') == ''
-                && incoming().organisationId == uid));
+                && incoming().organisationId == uid))
+        && validUserData(incoming())
+        && consentStampOk('termsAcceptedAt')
+        && consentStampOk('privacyAcceptedAt')
+        // Date of birth is fixed once the profile is complete (minor safety); support corrects it.
+        && (unchanged(['dateOfBirth']) || existing().get('profileStatus', '') != 'COMPLETE')
+        && playerCompleteOk(uid, incoming());
+      allow delete: if false;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // PLAYERS: public player profile (discoverable by signed-in users, e.g. coaches).
+    // Private account data must never appear here.
+    // ═════════════════════════════════════════════════════════════════════════
+    function validPlayerPublic(d) {
+      return d.uid is string
+        && !d.keys().hasAny(['email', 'dateOfBirth', 'phoneNumber', 'gender', 'password', 'role',
+                             'termsAcceptedAt', 'privacyAcceptedAt', 'notificationPreferences', 'profileStatus'])
+        && d.get('displayName', '') is string && d.get('displayName', '').size() <= 60
+        // Photo is a small data: URI (Spark plan) or a URL; keep the public document light.
+        && d.get('photoUrl', '') is string && d.get('photoUrl', '').size() <= 150000
+        && d.get('country', '') is string && d.get('country', '').size() <= 80
+        && d.get('state', '') is string && d.get('state', '').size() <= 80
+        && d.get('city', '') is string && d.get('city', '').size() <= 60
+        && d.get('region', '') is string && d.get('region', '').size() <= 40
+        && d.get('areaType', '') in ['', 'METRO', 'TIER_2', 'TIER_3', 'RURAL']
+        && d.get('primarySport', '') is string && d.get('primarySport', '').size() <= 40
+        && d.get('secondarySports', []) is list && d.get('secondarySports', []).size() <= 5
+        && d.get('sportProfile', {}) is map && d.get('sportProfile', {}).size() <= 10
+        && d.get('skillLevel', '') in ['', 'BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'COMPETITIVE', 'PROFESSIONAL']
+        && d.get('goals', []) is list && d.get('goals', []).size() <= 9
+        && d.get('coachingPreferences', {}) is map
+        && d.get('currentTeam', '') is string && d.get('currentTeam', '').size() <= 80
+        && d.get('academy', '') is string && d.get('academy', '').size() <= 80
+        && d.get('ranking', '') is string && d.get('ranking', '').size() <= 60
+        && d.get('bio', '') is string && d.get('bio', '').size() <= 500
+        && d.get('achievements', []) is list && d.get('achievements', []).size() <= 10;
+    }
+
+    match /players/{uid} {
+      allow read: if signedIn();
+      allow create: if isSelf(uid)
+        && roleAfter(uid) == 'PLAYER'
+        && incoming().uid == uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && validPlayerPublic(incoming());
+      allow update: if isSelf(uid)
+        && roleAfter(uid) == 'PLAYER'
+        && unchanged(['uid', 'createdAt'])
+        && incoming().updatedAt == request.time
+        && validPlayerPublic(incoming());
       allow delete: if false;
     }
 

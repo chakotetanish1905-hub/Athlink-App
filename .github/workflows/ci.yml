@@ -28,9 +28,25 @@ jobs:
       - name: Dummy google-services.json (CI only)
         run: cp .github/ci/google-services.json app/google-services.json
       - name: Unit tests
-        run: chmod +x gradlew && ./gradlew --no-daemon testDebugUnitTest
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon testDebugUnitTest 2>&1 | tee gradle-output.txt
+          exit ${PIPESTATUS[0]}
       - name: Assemble debug APK
-        run: ./gradlew --no-daemon assembleDebug
+        shell: bash
+        run: |
+          ./gradlew --no-daemon assembleDebug 2>&1 | tee -a gradle-output.txt
+          exit ${PIPESTATUS[0]}
+      - name: Report build failures as an annotation
+        if: failure()
+        shell: bash
+        run: |
+          [ -f gradle-output.txt ] || exit 0
+          # Kotlin compiler errors ("e: file://...") and failed tests, trimmed to fit one annotation.
+          summary=$( (grep -E '^e: |FAILED|Unresolved|> Task .* FAILED|What went wrong' -A2 gradle-output.txt | grep -v '^--$' | sed 's#file:///home/runner/work/[^/]*/[^/]*/##') | cut -c1-300 | head -120)
+          msg=$(printf '%s' "$summary" | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Gradle build output::${msg}"
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4

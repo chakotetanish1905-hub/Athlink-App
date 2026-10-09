@@ -43,6 +43,16 @@ class FileBytesReader @Inject constructor(
         "data:image/jpeg;base64," + Base64.encodeToString(jpeg, Base64.NO_WRAP)
     }
 
+    /**
+     * Player profile photo as a small `data:image/jpeg;base64,...` URI (about 30-110 KB), stored on
+     * the public `players/{uid}` document. Same approach as organisation logos: works on the Spark
+     * plan with no Cloud Storage, and only the resulting string is saved.
+     */
+    suspend fun prepareProfilePhotoDataUri(uri: String): String = withContext(Dispatchers.IO) {
+        val jpeg = compressJpeg(readAll(uri), maxDimension = 480, targetBytes = 80L * 1024)
+        "data:image/jpeg;base64," + Base64.encodeToString(jpeg, Base64.NO_WRAP)
+    }
+
     private fun readAll(uri: String): ByteArray =
         context.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() }
             ?: throw IllegalStateException("Couldn't open the selected file")

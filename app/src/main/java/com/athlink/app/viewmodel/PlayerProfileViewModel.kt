@@ -89,7 +89,7 @@ class PlayerProfileViewModel @Inject constructor(
                 }
                 .onFailure { e ->
                     _state.update {
-                        it.copy(isLoading = false, loadError = ErrorMessages.from(e, "We couldn't load your profile. Please try again.", "loadPlayer"))
+                        it.copy(isLoading = false, loadError = playerError(e, "We couldn't load your profile. Please try again.", "loadPlayer"))
                     }
                 }
         }
@@ -229,7 +229,7 @@ class PlayerProfileViewModel @Inject constructor(
                     } else {
                         val msg = if (e is SaveNotConfirmedException) {
                             "Please check your internet connection and try again. Your answers are kept."
-                        } else ErrorMessages.from(e, "We couldn't save your profile. Please try again.", "savePlayer")
+                        } else playerError(e, "We couldn't save your profile. Please try again.", "savePlayer")
                         _state.update { it.copy(isSaving = false, message = msg) }
                     }
                 }
@@ -289,4 +289,13 @@ class PlayerProfileViewModel @Inject constructor(
         )
         return PlayerSnapshot(updatedUser, stored)
     }
+
+    /** Player wording for errors (the shared messages mention organisation verification). */
+    private fun playerError(e: Throwable, fallback: String, context: String): String =
+        if (e is com.google.firebase.firestore.FirebaseFirestoreException &&
+            e.code == com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED
+        ) {
+            ErrorMessages.from(e, fallback, context) // still logs the technical detail
+            "Your profile can't be reached right now. Please try again in a moment."
+        } else ErrorMessages.from(e, fallback, context)
 }

@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -56,10 +57,12 @@ class PlayerOnboardingSectionsUiTest {
         assertEquals("Cricket", form.primarySport)
         rule.onNodeWithText("Cricket").assertIsSelected()
 
-        rule.onNodeWithText("Football").performScrollTo().performClick()
+        // Once a main sport is chosen, "Football" also appears in the "other sports" row; the
+        // first match is the main-sport chip.
+        rule.onAllNodesWithText("Football")[0].performScrollTo().performClick()
         rule.waitForIdle()
         assertEquals("Football", form.primarySport)
-        rule.onNodeWithText("Cricket").assertIsNotSelected()
+        rule.onAllNodesWithText("Cricket")[0].assertIsNotSelected()
     }
 
     @Test

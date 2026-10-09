@@ -33,18 +33,26 @@ class SaveNotConfirmedException : IllegalStateException("Write not confirmed by 
  * `users/{uid}` (private) and `players/{uid}` (public) are always written in ONE batch, so the
  * profile status can only become COMPLETE together with the data it describes.
  */
+/** Storage operations for player profiles (implemented by [PlayerDataSource]; faked in tests). */
+interface PlayerStore {
+    suspend fun loadOwn(): Result<PlayerSnapshot>
+    suspend fun getPlayer(uid: String): Result<PlayerProfile?>
+    suspend fun save(form: PlayerProfileForm, playerExists: Boolean, status: PlayerProfileStatus?, recordConsent: Boolean): Result<Unit>
+    suspend fun preparePhoto(file: PickedFile): Result<String>
+}
+
 @Singleton
 class PlayerDataSource @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
     private val fileReader: FileBytesReader
-) {
+) : PlayerStore {
     private fun requireUid(): String = auth.currentUser?.uid ?: throw NotSignedInException()
     private fun userRef(uid: String) = firestore.collection(FirestorePaths.USERS).document(uid)
     private fun playerRef(uid: String) = firestore.collection(FirestorePaths.PLAYERS).document(uid)
 
     /** Loads the signed-in player's documents. A missing `players` doc is normal (new / legacy player). */
-    suspend fun loadOwn(): Result<PlayerSnapshot> = try {
+    override suspend fun loadOwn(): Result<PlayerSnapshot> = try {
         val uid = requireUid()
         val userDoc = userRef(uid).get().await()
         val user = userDoc.toObject(User::class.java) ?: throw IllegalStateException("Account record not found")
@@ -55,7 +63,7 @@ class PlayerDataSource @Inject constructor(
     }
 
     /** Public profile of any player (signed-in users only). Never includes private account data. */
-    suspend fun getPlayer(uid: String): Result<PlayerProfile?> = try {
+    override suspend fun getPlayer(uid: String): Result<PlayerProfile?> = try {
         val doc = playerRef(uid).get().await()
         Result.success(doc.takeIf { it.exists() }?.toObject(PlayerProfile::class.java))
     } catch (e: Exception) {
@@ -71,7 +79,7 @@ class PlayerDataSource @Inject constructor(
      * @param recordConsent true when the player accepted Terms / Privacy in this form (accounts
      *   created before player onboarding existed); stamps server-time consent once.
      */
-    suspend fun save(
+    override suspend fun save(
         form: PlayerProfileForm,
         playerExists: Boolean,
         status: PlayerProfileStatus?,
@@ -109,7 +117,7 @@ class PlayerDataSource @Inject constructor(
     }
 
     /** Shrinks the picked photo to a small JPEG data URI. Nothing is written until the profile is saved. */
-    suspend fun preparePhoto(file: PickedFile): Result<String> = try {
+    override suspend fun preparePhoto(file: PickedFile): Result<String> = try {
         Result.success(fileReader.prepareProfilePhotoDataUri(file.uri))
     } catch (e: Exception) {
         Result.failure(e)

@@ -7,7 +7,7 @@ import com.athlink.app.data.model.PlayerProfile
 import com.athlink.app.data.model.PlayerProfileForm
 import com.athlink.app.data.model.PlayerProfilePolicy
 import com.athlink.app.data.model.PlayerProfileStatus
-import com.athlink.app.data.remote.PlayerDataSource
+import com.athlink.app.data.remote.PlayerStore
 import com.athlink.app.data.remote.PlayerSnapshot
 import java.time.LocalDate
 import javax.inject.Inject
@@ -23,7 +23,7 @@ class InvalidProfileException(val errors: Map<PlayerField, String>) :
  */
 @Singleton
 class PlayerRepository @Inject constructor(
-    private val source: PlayerDataSource
+    private val source: PlayerStore
 ) {
     suspend fun loadOwn(): Result<PlayerSnapshot> = source.loadOwn()
 
